@@ -8,6 +8,7 @@ import streamlit as st
 from core import compliance as CO
 from eval import metrics as M
 from ui import common as C
+from ui import fmt
 from ui import style as U
 
 q, m = C.ranked(), C.meta()
@@ -18,8 +19,26 @@ n_queued = int((q.status != "not_queued").sum())
 n_slate = int((q.status == "in_capacity").sum())
 reduction = 1 - n_queued / max(f.get("claims_flagged", 1), 1)
 
-U.page_header("Overview", f"Synthetic Medicaid program · data through {m.get('asof', '—')} · "
-                          f"{C.investigators()} investigators · policy {C.policy()['_hash'][:10]}")
+act = U.page_header("Overview", f"See how {n_claims:,} synthetic Medicaid claims become a short, explainable SIU "
+                                f"slate · data through {fmt.day(m.get('asof'))} · policy v{C.policy()['version']}",
+                    actions=True)
+if act.button("Open SIU Queue", type="primary", icon=":material/arrow_forward:", width="stretch"):
+    st.switch_page("views/2_Queue.py")
+st.subheader("How it works")
+for col, step in zip(st.columns(5), [
+        ("detect", "views/4_Network.py", "Detect", ":material/radar:", "Rules, peer statistics, the network and a "
+         "forecast each look at every claim."),
+        ("fuse", "views/3_Case.py", "Fuse", ":material/merge:", "Alerts collapse into provider or ring cases with "
+         "cited evidence and a confidence."),
+        ("policy", "views/5_Policy.py", "Policy", ":material/gavel:", "Human-written, signed rules decide which "
+         "actions are allowed."),
+        ("queue", "views/2_Queue.py", "Queue", ":material/format_list_numbered:", "Cases are ranked to fit this "
+         "week's investigator hours."),
+        ("decide", "views/6_Ledger.py", "Decide + prove", ":material/verified:", "A person signs the decision; the "
+         "hash-chained ledger proves it.")]):
+    with col:
+        U.step_card(step[0], ["detect", "fuse", "policy", "queue", "decide"].index(step[0]) + 1, *step[1:])
+U.gap()
 
 steps = [("Claims", n_claims, "all claim lines"), ("Flagged claims", f.get("claims_flagged", 0), "rule / lens hits"),
          ("Alerts", f.get("alerts", 0), "entity-level"), ("Cases", len(q), "provider or ring"),
@@ -41,7 +60,7 @@ with a, U.card("funnel"):
                       yaxis=dict(showgrid=False), margin=dict(l=8, r=64, t=8, b=8))
     U.plot(fig)
 with b, U.card("dollars"):
-    st.subheader("$ at risk by recommended action")
+    st.subheader("$ at risk by action")
     d = q.groupby("recommended_action").dollars_at_risk.sum().reindex(list(U.ACTION_COLORS)[::-1]).dropna()
     fig = go.Figure(go.Bar(y=[U.action_label(x) for x in d.index], x=d.values, orientation="h",
                            marker_color=[U.ACTION_COLORS[x] for x in d.index], cliponaxis=False,
@@ -49,6 +68,7 @@ with b, U.card("dollars"):
     fig.update_layout(template=U.plotly_template(), height=250, xaxis=dict(showticklabels=False, showgrid=False),
                       yaxis=dict(showgrid=False), margin=dict(l=8, r=56, t=8, b=8))
     U.plot(fig)
+    st.caption("Bar chart: dollars at risk per recommended action; MFCU referrals hold the most.")
     U.metric_tile("Weeks to clear the queue", q.attrs.get("weeks_to_clear"),
                   f"{q.attrs.get('queued_hours', 0):.0f} queued h ÷ {q.attrs.get('capacity_hours', 0):.0f} h/week")
 
@@ -77,6 +97,8 @@ else:
                          go.Bar(x=rc.scheme, y=rc.prepay_plus, name="Prepay review or higher", marker_color=U.ACCENT)])
         fig.update_layout(template=U.plotly_template(), barmode="group", height=320, yaxis=dict(tickformat=".0%"))
         U.plot(fig)
+        st.caption("Grouped bars per planted scheme: share caught by any case and share reaching prepay review or "
+                   "higher. Table version in docs/RESULTS.md.")
     with c2, U.card("legit"):
         st.subheader("Legitimate outliers")
         st.caption("High-cost oncology, busy ERs and honest one-off billing slips: none may reach FULL or MFCU.")

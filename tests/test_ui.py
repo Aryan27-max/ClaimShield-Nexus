@@ -114,7 +114,7 @@ def test_horizon_and_investigators_rerank(tmp_ledger):
         at.session_state["horizon"], at.session_state["investigators"] = h, n
         at.run()
         assert not at.exception, [e.value for e in at.exception]
-        assert any(f"{n} investigators · {30 * n} h this week · {h}-day horizon" in m.value for m in at.markdown)
+        assert any(f"{n} investigators · {30 * n} h · {h}\u2011day horizon" in m.value for m in at.markdown)
 
 
 def test_ledger_ui_tamper_then_verify_shows_broken_block(tmp_ledger):
@@ -122,6 +122,7 @@ def test_ledger_ui_tamper_then_verify_shows_broken_block(tmp_ledger):
         ledger.append("system:test", "probe", {"i": i}, tmp_ledger)
     at = _app("views/6_Ledger.py")
     at.number_input[0].set_value(1)
+    at.checkbox(key="confirm_tamper").check().run()
     next(b for b in at.button if b.label == "Simulate tamper").click()
     at.run()
     at.button(key="verify").click()
@@ -208,6 +209,7 @@ def test_full_dual_control_flow_obligations_and_tamper(tmp_ledger):
     assert any("signed mandates verified" in m.value for m in at.markdown)
     idx = int(M.verify_signatures(tmp_ledger).query("event_type == 'decision_mandate'").idx.iloc[0])
     at.number_input[0].set_value(idx)
+    at.checkbox(key="confirm_tamper").check().run()
     next(b for b in at.button if b.label == "Simulate tamper").click().run()
     at.button(key="verify").click().run()
     assert any(f"broken at block {idx}" in m.value for m in at.markdown)
@@ -255,7 +257,7 @@ def test_auditor_cannot_reveal(tmp_ledger):
 def test_sidebar_reset_demo_opens_ledger_controls(tmp_ledger):
     at = AppTest.from_file(APP, default_timeout=60)
     at.run()
-    assert any("Public demo · synthetic data · shared state" in m.value for m in at.sidebar.markdown)
+    assert any("Public demo · synthetic data" in m.value for m in at.sidebar.markdown)
     next(b for b in at.sidebar.button if b.label == "Reset demo").click().run()
     assert not at.exception and at.title[0].value == "Audit Ledger"
     assert any(b.label == "Reset demo ledger" for b in at.button)

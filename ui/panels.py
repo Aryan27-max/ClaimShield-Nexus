@@ -21,6 +21,7 @@ def _flash(msg: str) -> None:
 def show_flash() -> None:
     if msg := st.session_state.pop("flash", None):
         st.success(msg)
+        st.toast(msg, icon=":material/check_circle:")
 
 
 def _state(step: dict | None) -> str:

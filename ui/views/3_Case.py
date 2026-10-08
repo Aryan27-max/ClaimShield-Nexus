@@ -15,7 +15,9 @@ q = C.ranked()
 C.require_cases(q)
 ids = q.case_id.tolist()
 cur = st.session_state.get("case_id")
-case_id = st.selectbox("Case", ids, index=ids.index(cur) if cur in ids else 0)
+head = st.container()
+case_id = st.columns([1, 3])[0].selectbox("Switch case", ids, index=ids.index(cur) if cur in ids else 0,
+                                          help="Cases in queue order.")
 st.session_state["case_id"] = case_id
 r = q.set_index("case_id").loc[case_id]
 pol = C.policy()
@@ -25,14 +27,17 @@ if case_id not in seen:  # audit controls: who opened which case, once per case 
     seen.add(case_id)
 
 who = f"Ring of {r.n_providers} providers" if r.case_type == "ring" else "Provider"
-U.page_header(f"Case {case_id}", f"{who} {', '.join(r.providers)} · {', '.join(r.provider_types)} · "
-                                 f"rank #{r['rank']} · {r.status.replace('_', ' ')}")
+with head:
+    act = U.page_header(f"Case {case_id}", f"Review the evidence, then record a signed decision · {who} "
+                                           f"{', '.join(r.providers)} · rank #{r['rank']} · {r.status.replace('_', ' ')}",
+                        actions=True)
+    with act:
+        U.cta_link("Record decision", "#record-decision")
 U.html_line(U.action_badge(r.recommended_action), "&nbsp;", U.class_chips(r.classes))
-U.gap()
 tiles = [("Evidence confidence", fmt.pct(r.confidence), f"fused {fmt.pct(r.fused_score)} × completeness "
                                                         f"{fmt.pct(r.completeness)}"),
-         (f"P(escalation, {q.attrs.get('horizon')} d)", f"{r.p_fwa:.0%}", "calibrated model" if r.has_model_score
-          else "no model score"),
+         ("Chance of escalation", fmt.pct(r.p_fwa),
+          f"{q.attrs.get('horizon')}\u2011day forecast · not evidence" if r.has_model_score else "no model score"),
          ("$ at risk", fmt.money(r.dollars_at_risk), f"{r.n_flagged_claims:,} flagged claims"),
          ("Members affected", f"{r.members_affected:,}", f"{r.vulnerable_share:.0%} under 18 or 65+"),
          ("Est. hours", f"{r.est_hours:.0f}", "must-take" if r.must_take else "")]
@@ -41,10 +46,11 @@ for col, (label, value, delta) in zip(st.columns(len(tiles)), tiles):
         U.metric_tile(label, value, delta)
 U.gap()
 if r.recommended_action == "NEEDS_MORE_DATA":
-    st.warning("Needs more data — missing evidence class(es): **" + ", ".join(r.missing_classes) +
-               "**. Gather corroborating evidence before any escalation.")
+    U.callout("Needs more data: missing evidence class(es) " + ", ".join(r.missing_classes) + ". The system abstains; "
+              "the Compliance and Brief tabs list what would change its mind.", "orange", "help")
 if r.requires_human:
-    st.info("REFER_TO_MFCU is allowed for this case and always requires a human decision.")
+    U.callout("Refer to MFCU is allowed for this case. It needs two signatures: the deciding investigator's and a "
+              "different SIU lead's.", "blue", "verified_user")
 
 tab_ev, tab_risk, tab_tl, tab_net, tab_why, tab_comp, tab_brief = st.tabs(
     ["Evidence", "Risk forecast", "Timeline", "Network", "Why this action", "Compliance", "Brief"])
@@ -104,7 +110,8 @@ with tab_tl, U.card("timeline"):
 
 with tab_net, U.card("network"):
     if st.toggle("Show ego network (≤ 150 nodes)", value=False, key=f"net_{case_id}"):
-        html, n = C.ego_html(case_id if r.case_type == "ring" else r.providers[0], list(r.providers))
+        with st.spinner("Drawing the network…"):
+            html, n = C.ego_html(case_id if r.case_type == "ring" else r.providers[0], list(r.providers))
         st.caption(f"{n} nodes · red = case providers; bold red edges = referrals between them · blue providers · "
                    "orange owners · green addresses · purple banks · grey members")
         st.iframe(html, height=540)
@@ -127,6 +134,7 @@ with tab_brief, U.card("brief"):
             st.session_state[key] = brief.generate({**r.to_dict(), "case_id": case_id}, pol,
                                                    C.claims(C._mtime(C.S.OUT / "claims.parquet")),
                                                    C.table("providers"), C.table("graph_features"), C.meta(), actor=actor)
+            st.toast("Brief generated and its hash added to the ledger", icon=":material/description:")
         except (OSError, ValueError, KeyError) as e:
             C.show_error(e, "Brief could not be generated")
     b = st.session_state.get(key)
@@ -142,14 +150,15 @@ U.gap()
 with U.card("decision"):
     P.show_flash()
     P.authorisation(case_id, pol)
-    st.subheader("Human decision")
+    st.subheader("Record decision", anchor="record-decision")
     who, role = C.me(), C.my_role()
     can_sign = role in ("investigator", "siu_lead")
     st.caption(f"Signing as {who} ({identity.ROLE_LABELS.get(role, role)}) · the Ed25519 decision mandate binds the "
                "case, evidence and policy hashes")
     with st.form("decision", clear_on_submit=False, border=False):
         a, b = st.columns(2)
-        action = a.selectbox("Action (allowed by policy)", list(r.allowed_actions), key="action")
+        action = a.selectbox("Action (allowed by policy)", list(r.allowed_actions), key="action",
+                             format_func=U.action_label, help="Only actions the signed policy allows for this case.")
         reasons = pol["reason_codes"]
         reason = b.selectbox("Reason code", list(reasons), format_func=lambda k: f"{k} — {reasons[k]}", key="reason_code")
         note = a.text_area("Note", key="note", height=68)
@@ -165,13 +174,20 @@ with U.card("decision"):
             out = harness.decide(case_id, action, who, reason, note, cases=q, policy=pol, mandate=block, amount=amt)
             state = ("pending approval: a different SIU lead must add the second signature"
                      if out["status"] == "PENDING_APPROVAL" else "executed")
-            st.success(f"Signed {action} on {case_id} ({state}) → ledger block #{out['ledger_idx']} · mandate "
-                       f"{out['mandate_hash'][:12]}")
+            st.success(f"Signed {U.action_label(action)} on {case_id} ({state}) → ledger block #{out['ledger_idx']} · "
+                       f"mandate {out['mandate_hash'][:12]}")
+            st.toast(f"Decision signed: {U.action_label(action)}", icon=":material/draw:")
+            st.session_state["signed_case"] = case_id
         except ValueError as e:
             st.error(str(e))
+    if st.session_state.get("signed_case") == case_id:
+        if st.button("View in Audit Ledger", icon=":material/arrow_forward:"):
+            st.switch_page("views/6_Ledger.py")
     prev = harness.decisions()
     prev = prev[prev.case_id == case_id]
     if len(prev):
-        st.dataframe(prev[["ts", "user_id", "action", "status", "reason_code", "note", "ledger_idx"]],
-                     hide_index=True, width="stretch")
+        st.dataframe(prev.assign(action=prev.action.map(U.action_label), status=prev.status.str.replace("_", " ").str.lower())[
+            ["ts", "user_id", "action", "status", "reason_code", "note", "ledger_idx"]], hide_index=True, width="stretch")
+    else:
+        st.caption("No decisions on this case yet.")
 st.caption(C.FOOTER)

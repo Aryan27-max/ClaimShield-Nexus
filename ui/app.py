@@ -10,6 +10,7 @@ from core import bootstrap as B  # noqa: E402
 from core import identity  # noqa: E402
 from core import mandate as M  # noqa: E402
 from ui import common as C  # noqa: E402
+from ui import glossary as G  # noqa: E402
 from ui import style as U  # noqa: E402
 
 st.set_page_config(page_title="ClaimShield Nexus", page_icon=":shield:", layout="wide")
@@ -27,20 +28,22 @@ PAGES = [st.Page("views/1_Overview.py", title="Overview", icon=":material/insigh
          st.Page("views/4_Network.py", title="Network", icon=":material/hub:"),
          st.Page("views/5_Policy.py", title="Policy", icon=":material/gavel:"),
          st.Page("views/6_Ledger.py", title="Audit Ledger", icon=":material/link:")]
-nav = st.navigation(PAGES)
+nav = st.navigation(PAGES, position="top")
 
 with st.sidebar:
     U.theme_toggle()
     U.keep_theme_in_url()
     st.markdown("## ClaimShield Nexus")
     st.caption("Machines find evidence. Humans make decisions. The ledger proves it.")
-    U.html_line(U.chip("Public demo · synthetic data · shared state", "blue"))
-    st.divider()
+    U.html_line(U.chip("Public demo · synthetic data", "blue"))
+    st.caption("Everyone using this demo shares one ledger; Reset demo starts over.")
+    G.popover()
+    st.subheader("Session")
     st.session_state.setdefault("identity", "inv.a")
     st.selectbox("Signed in as", identity.people(), key="identity",
-                 format_func=lambda u: f"{u} · {identity.ROLE_LABELS[identity.role(u)]}")
-    st.caption("Demo identities · Ed25519 keys in data/out/keys (production: SSO + HSM/KMS keys)")
-    st.divider()
+                 format_func=lambda u: f"{u} · {identity.ROLE_LABELS[identity.role(u)]}",
+                 help="Demo identities with Ed25519 keys in data/out/keys. Investigators sign decisions; an SIU lead "
+                      "approves MFCU referrals and signs policies; auditors can only look.")
     files = C.policy_files()
     if st.session_state.get("pending_policy") in files:  # set by the Policy page after "Save as new version"
         st.session_state["policy_path"] = st.session_state.pop("pending_policy")
@@ -54,23 +57,26 @@ with st.sidebar:
     except (OSError, ValueError) as e:
         st.error(f"Policy cannot be loaded: {e}")
         st.stop()
-    st.selectbox("Policy version", files, key="policy_path", format_func=C.policy_label)
-    st.segmented_control("Risk horizon (days)", [30, 60, 90], default=90, key="horizon")
-    st.caption("Queue uses the calibrated escalation model for this horizon.")
-    st.slider("Investigators", 1, 10, value=pol["capacity"]["investigators"], key="investigators")
-    st.caption(f"{pol['capacity']['hours_per_investigator_week']} h per investigator per week")
-    if st.button("Reset demo", help="Opens the demo controls on the Audit Ledger page (fresh ledger and pipeline)."):
-        st.session_state["open_reset"] = True
-        st.switch_page("views/6_Ledger.py")
-    if st.button("Re-run pipeline", help="Not needed for normal use; sliders only re-rank."):
-        from core import pipeline
-        try:
-            with st.spinner("Running lenses, fusion and harness..."):
-                pipeline.run_all()
-            st.cache_data.clear()
-            st.rerun()
-        except (OSError, ValueError) as e:
-            st.error(f"Pipeline did not run: {e}")
+    st.selectbox("Policy version", files, key="policy_path", format_func=C.policy_label,
+                 help="The human-authored rules in force. Each version is signed by an SIU lead and hashed.")
+    st.segmented_control("Risk horizon (days)", [30, 60, 90], default=90, key="horizon",
+                         help="Which forecast orders the queue: chance of escalation within 30, 60 or 90 days.")
+    st.slider("Investigators", 1, 10, value=pol["capacity"]["investigators"], key="investigators",
+              help=f"Team size this week ({pol['capacity']['hours_per_investigator_week']} h each). The queue fills "
+                   "these hours, must-take cases first.")
+    with st.expander("Demo tools", icon=":material/build:"):
+        if st.button("Reset demo", help="Opens the reset controls on the Audit Ledger page.", width="stretch"):
+            st.session_state["open_reset"] = True
+            st.switch_page("views/6_Ledger.py")
+        if st.button("Re-run pipeline", help="Not needed for normal use; the sidebar only re-ranks.", width="stretch"):
+            from core import pipeline
+            try:
+                with st.spinner("Running lenses, fusion and harness..."):
+                    pipeline.run_all()
+                st.cache_data.clear()
+                st.rerun()
+            except (OSError, ValueError) as e:
+                st.error(f"Pipeline did not run: {e}")
 
 authorised, why, _ = M.policy_status(pol)
 if not authorised:

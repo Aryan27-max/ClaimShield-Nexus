@@ -109,10 +109,10 @@ html, body, .stApp, button, input, textarea, select, [data-testid="stMarkdownCon
 div[class*="st-key-btnrow_"] {{ gap: {v("space-sm")} !important; flex-wrap: wrap; }}
 h1 {{ font-size: 40px !important; font-weight: 700 !important; letter-spacing: -0.02em; line-height: 1.1; }}
 h2, h3 {{ font-weight: 600 !important; letter-spacing: -0.015em; }}
-.cs-sub {{ color: {v("text-2")}; font-size: 17px; margin: -0.6rem 0 {v("space-l")} 0; max-width: 760px; }}
+.cs-sub {{ color: {v("text-2")}; font-size: 17px; margin: -0.6rem 0 {v("space-l")} 0; max-width: 880px; }}
 .cs-sub b {{ color: {v("text")}; font-weight: 600; }}
 .cs-muted, [data-testid="stCaptionContainer"] {{ color: {v("text-2")} !important; }}
-#MainMenu, footer, [data-testid="stToolbar"], [data-testid="stAppDeployButton"], [data-testid="stDecoration"] {{
+#MainMenu, [data-testid="stMainMenu"], footer, [data-testid="stAppDeployButton"], [data-testid="stDecoration"] {{
   display: none !important; }}
 header[data-testid="stHeader"] {{ background: transparent; }}
 [data-testid="stSidebar"] {{ background: {v("sidebar")} !important;
@@ -160,6 +160,17 @@ button:focus-visible, a:focus-visible, [role="tab"]:focus-visible, input:focus-v
   box-shadow: {sh}; }}
 [data-testid="stTabs"] [data-baseweb="tab-list"] {{ gap: 6px; }}
 hr {{ border-color: {v("border")} !important; }}
+.cs-callout {{ display: flex; gap: {v("space-sm")}; align-items: flex-start; padding: 14px 18px; border-radius: 14px;
+  font-size: 15px; font-weight: 500; line-height: 1.45; }}
+.cs-cta {{ display: inline-flex; align-items: center; gap: {v("space-s")}; min-height: 44px; padding: 0 {v("space-l")};
+  border-radius: 980px; background: {v("button")}; color: #fff !important; font-weight: 600; text-decoration: none !important; }}
+div[class*="st-key-step_"] {{ background: {v("surface")}; border-radius: 14px; box-shadow: {sh}; padding: {v("space-m")};
+  min-height: 160px; }}
+div[class*="st-key-step_"] [data-testid="stPageLink"] p {{ font-weight: 700; font-size: 15px; }}
+.cs-stepno {{ color: {v("accent-text")}; font-size: 12px; font-weight: 700; letter-spacing: .04em; }}
+@media (max-width: 1400px) {{ .cs-tile {{ padding: 14px 16px; min-height: 136px; }} .cs-tile .v {{ font-size: 26px; }}
+  .cs-tile .l, .cs-tile .d {{ font-size: 12px; }} .block-container {{ padding-left: {v("space-xl")};
+  padding-right: {v("space-xl")}; }} }}
 .stPlotlyChart .main-svg text {{ fill: {v("text")} !important; }}
 .stPlotlyChart .gridlayer path {{ stroke: {v("grid")} !important; }}
 .stPlotlyChart .hoverlayer path {{ fill: {v("surface")} !important; stroke: {v("border")} !important; }}
@@ -202,6 +213,27 @@ def page_header(title: str, subtitle: str = "", actions: bool = False):
         if subtitle:
             st.markdown(f'<div class="cs-sub">{html.escape(subtitle)}</div>', unsafe_allow_html=True)
     return right
+
+
+def callout(text: str, tone: str = "blue", icon: str = "info") -> None:
+    """Tinted note with an icon and plain text (meaning never carried by colour alone)."""
+    t = TONE.get(tone, "neutral")
+    st.markdown(f'<div class="cs-callout" role="note" style="color:{var(t + "-text")};background:{var(t + "-bg")}">'
+                f'<span class="cs-ico" aria-hidden="true">{icon}</span><span>{html.escape(text)}</span></div>',
+                unsafe_allow_html=True)
+
+
+def cta_link(label: str, href: str, icon: str = "arrow_downward") -> None:
+    """Primary-looking link (e.g. jump to the decision form on the same page)."""
+    st.markdown(f'<a class="cs-cta" href="{html.escape(href)}" target="_self">{html.escape(label)}'
+                f'<span class="cs-ico" aria-hidden="true">{icon}</span></a>', unsafe_allow_html=True)
+
+
+def step_card(key: str, number: int, page: str, label: str, icon: str, text: str) -> None:
+    with st.container(key=f"step_{key}"):
+        st.markdown(f'<div class="cs-stepno">STEP {number}</div>', unsafe_allow_html=True)
+        st.page_link(page, label=label, icon=icon)
+        st.caption(text)
 
 
 def gap() -> None:

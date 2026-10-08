@@ -189,3 +189,24 @@ def has_ground_truth() -> bool:
 def labels() -> pd.DataFrame:
     """Ground-truth entity labels: for the synthetic-validation sections only (never fed to core)."""
     return _labels(_mtime(S.OUT / "ground_truth.parquet"))
+
+
+def ledger_summary(event: str, b: dict) -> str:
+    """One readable line per ledger block (the raw payload stays available below the table)."""
+    who = b.get("user_id") or b.get("signer") or b.get("issuer") or b.get("approver") or b.get("user") or ""
+    case = b.get("case_id") or ""
+    return {
+        "lens_run": f"{b.get('lens', '')} lens: {b.get('n_alerts', '')} alerts",
+        "model_run": f"forecast models trained ({len(b.get('horizons', {}))} horizons)",
+        "fusion_run": f"{b.get('n_cases', '')} cases scored under policy v{b.get('policy_version', '')}",
+        "policy_mandate": f"{who} signed policy v{b.get('policy_version', '')}",
+        "policy_change": f"{b.get('author', '')} saved policy v{b.get('new_version', '')}: {b.get('reason', '')}",
+        "decision_mandate": f"{who} signed {b.get('action', '')} on {case}",
+        "human_decision": f"{who}: {b.get('action', '')} on {case} ({str(b.get('status', '')).lower()})",
+        "execution_mandate": f"{who} approved (second signature) on {case}",
+        "revocation": f"{who} revoked a {b.get('target_type', '')} mandate",
+        "brief_generated": f"brief generated for {case}",
+        "case_viewed": f"{who} opened {case}",
+        "phi_access": f"{who} revealed member details on {case}: {b.get('reason', '')}",
+        "compliance_event": f"{str(b.get('event', '')).replace('_', ' ')}: {b.get('type', '')} {case}".strip(),
+    }.get(event, ", ".join(f"{k}={v}" for k, v in list(b.items())[:3]))

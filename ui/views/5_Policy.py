@@ -12,12 +12,15 @@ from core import policy_edit as PE
 from eval import metrics as M
 from ui import common as C
 from ui import fmt
+from ui import glossary as G
 from ui import style as U
 
 pol, cases = C.policy(), C.cases()
-U.page_header("Policy", "Models propose, this policy constrains, a human decides. Every version is hashed into the ledger.")
+U.page_header("Policy", "Change a threshold, preview who would be affected, then sign a new version (SIU lead only). "
+                        "Models propose, this policy constrains, a human decides.")
 if msg := st.session_state.pop("policy_saved", None):
     U.result_card(True, msg)
+    st.toast("New policy version signed and saved", icon=":material/gavel:")
     U.gap()
 
 created = fmt.day(pol.get("created") or datetime.fromtimestamp(Path(pol["_path"]).stat().st_mtime))
@@ -49,16 +52,19 @@ U.gap()
 values, avail = {}, PE.available_thresholds(pol)
 with U.card("thresholds"):
     st.subheader("Key thresholds")
+    st.caption("Hover the ? next to a threshold to see what it controls. Nothing changes until you preview and save.")
     cols = st.columns(3)
     for i, (path, label) in enumerate(avail.items()):
         v, key = PE.get_threshold(pol, path), f"th_{path}_{pol['_hash'][:8]}"
         with cols[i % 3]:
             if isinstance(v, float) and v <= 1:
-                values[path] = st.slider(label, 0.0, 1.0, float(v), 0.01, key=key)
+                values[path] = st.slider(label, 0.0, 1.0, float(v), 0.01, key=key, help=G.THRESHOLD_HELP.get(path))
             elif path.startswith("capacity."):
-                values[path] = st.number_input(label, min_value=1, max_value=168, value=int(v), step=1, key=key)
+                values[path] = st.number_input(label, min_value=1, max_value=168, value=int(v), step=1, key=key,
+                                               help=G.THRESHOLD_HELP.get(path))
             else:
-                values[path] = st.number_input(label, min_value=0, value=int(v), step=1000 if v > 1000 else 1, key=key)
+                values[path] = st.number_input(label, min_value=0, value=int(v), step=1000 if v > 1000 else 1, key=key,
+                                               help=G.THRESHOLD_HELP.get(path))
     if missing := [label for path, label in PE.THRESHOLDS.items() if path not in avail]:
         st.caption("Not in this policy version: " + ", ".join(missing))
     changed = {k: v for k, v in values.items() if v != PE.get_threshold(pol, k)}
@@ -73,6 +79,9 @@ except ValueError as e:
 U.gap()
 if st.button("Preview impact", key="preview", type="primary", disabled=not changed):
     st.session_state["preview_of"] = changed
+    st.toast("Preview computed in memory; nothing saved", icon=":material/visibility:")
+if not changed:
+    st.caption("Change a threshold above to enable the preview.")
 if st.session_state.get("preview_of") == changed and changed:
     after = harness.evaluate_all(cases.drop(columns=harness.OUTPUT_COLS), new)
     d = PE.diff(cases, pol, new)
