@@ -8,13 +8,16 @@ f = m.get("funnel", {})
 cap, used = q.attrs.get("capacity_hours", 0), q.attrs.get("used_hours", 0)
 
 st.title("SIU Queue")
-cols = st.columns(6)
+cols = st.columns(7)
 cols[0].metric("Claims flagged", f"{f.get('claims_flagged', 0):,}")
 cols[1].metric("Alerts", f.get("alerts", 0))
 cols[2].metric("Cases", len(q))
 cols[3].metric("In capacity", int((q.status == "in_capacity").sum()), help=f"{used:.0f} of {cap:.0f} investigator hours")
 cols[4].metric("Deferred", int((q.status == "deferred").sum()), help="Shown, never dropped")
-cols[5].metric("Needs more data", int((q.recommended_action == "NEEDS_MORE_DATA").sum()))
+cols[5].metric("Over capacity", int((q.status == "over_capacity").sum()), help="Must-take cases that don't fit: escalate to SIU lead")
+cols[6].metric("Weeks to clear", q.attrs.get("weeks_to_clear"), help="Queued hours ÷ weekly capacity")
+if (q.status == "over_capacity").any():
+    st.error(f"{int((q.status == 'over_capacity').sum())} must-take case(s) exceed this week's capacity — escalate to SIU lead.")
 st.caption(f"Horizon {q.attrs.get('horizon')} d · {st.session_state.get('investigators')} investigators · "
            f"capacity {cap:.0f} h/week · policy {q.policy_hash.iloc[0][:10] if len(q) else '-'} · "
            "priority = p_fwa × $ at risk × severity_w × member_harm_w ÷ est_hours")

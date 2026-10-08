@@ -124,6 +124,8 @@ weights: {severity: {1: 1, 3: 1.5, 5: 3}, member_harm: {bh: 2.0, home_health: 1.
 capacity: {investigators: 3, hours_per_investigator_week: 30}
 ```
 
+Queue: `priority = p_fwa(h) × $ at risk × severity_w × member_harm_w ÷ est_hours`. Must-take cases (policy `must_take`: REFER_TO_MFCU or severity ≥ 5) are filled first; a must-take case that doesn't fit is flagged `over_capacity` (escalate to SIU lead), never silently deferred. The rest fill greedily; overflow is `deferred`. Backlog = queued hours ÷ weekly capacity (weeks to clear).
+
 ## 7. Decision sequence
 ```mermaid
 sequenceDiagram

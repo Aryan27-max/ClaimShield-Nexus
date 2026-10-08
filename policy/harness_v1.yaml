@@ -55,11 +55,15 @@ member_harm:
 est_hours:
   MONITOR: 0
   NEEDS_MORE_DATA: 0
-  PROVIDER_EDUCATION: 3
+  PROVIDER_EDUCATION: 2
   PREPAY_REVIEW: 6
-  FULL_INVESTIGATION: 20
-  REFER_TO_MFCU: 30
+  FULL_INVESTIGATION: 16
+  REFER_TO_MFCU: 12        # SIU prep before handoff to MFCU
   per_extra_provider: 2
+
+must_take:                 # filled first; if it doesn't fit => over capacity, escalate to SIU lead
+  actions: [REFER_TO_MFCU]
+  min_severity: 5          # any queued case at this severity is also must-take
 
 capacity:
   investigators: 3

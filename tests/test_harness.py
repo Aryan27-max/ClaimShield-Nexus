@@ -70,10 +70,22 @@ def test_decide_writes_decision_and_ledger(tmp_path):
 
 
 def test_queue_respects_capacity():
-    rows = [_case(f"P{i:04d}", usd=10_000.0 * (i + 1), sev=5) for i in range(10)]
+    rows = [_case(f"P{i:04d}", usd=10_000.0 * (i + 1), sev=4) for i in range(10)]
     rows.append(_case("P0100", classes=("statistical",), conf=0.3, codes=("AN:x",)))
     q = Q.rank(_cases(*rows), POLICY, investigators=1, hours_per_week=50)
     used = q.est_hours[q.status == "in_capacity"].sum()
     assert used <= 50 and (q.status == "deferred").sum() >= 1
     assert q.set_index("case_id").status["P0100"] == "not_queued"
     assert len(q) == 11
+
+
+def test_must_take_fills_first_and_flags_over_capacity():
+    small = [_case(f"P{i:04d}", conf=0.7, usd=1_000_000.0, sev=3, codes=("R01",)) for i in range(5)]
+    mfcu = [_case(f"M{i:04d}", classes=("deterministic", "structural"), conf=0.95, usd=30_000.0, sev=4)
+            for i in range(3)]
+    q = Q.rank(_cases(*small, *mfcu), POLICY, investigators=1, hours_per_week=25).set_index("case_id")
+    assert q.loc[["M0000", "M0001", "M0002"], "recommended_action"].eq("REFER_TO_MFCU").all()
+    assert q.must_take.sum() == 3
+    assert (q.status[q.must_take] == "in_capacity").sum() == 2 and (q.status == "over_capacity").sum() == 1
+    assert "deferred" not in set(q.status[q.must_take])
+    assert q.attrs["weeks_to_clear"] == round(q.est_hours[q.queued].sum() / 25, 1)
