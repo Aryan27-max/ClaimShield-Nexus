@@ -143,7 +143,7 @@ def fill(skel: pd.DataFrame, ctx: dict, rng) -> pd.DataFrame:
 
 
 def base_claims(rng, members, providers, ctx) -> pd.DataFrame:
-    mem_by_cl = members.groupby("cluster").member_id.apply(np.array).to_dict()
+    mem_by_cl = ctx["mem_by_cl"]
     parts = []
     for p in providers.itertuples():
         _, _, median, mix = SPECIALTIES[p.specialty]
@@ -206,7 +206,7 @@ def generate(seed: int = S.SEED) -> dict:
         "ref_by_cl": refs.groupby("cluster").provider_id.apply(np.array).to_dict(),
         "hosp_by_cl": hosp.groupby("cluster").facility_id.apply(np.array).to_dict(),
         "fac_of": dict(zip(providers.loc[providers.type == "facility", "provider_id"], hosp.facility_id)),
-        "extra_referrals": [], "fill": lambda sk: fill(sk, ctx, rng),
+        "mem_by_cl": members.groupby("cluster").member_id.apply(np.array).to_dict(), "extra_referrals": [], "fill": lambda sk: fill(sk, ctx, rng),
     }
     claims = base_claims(rng, members, providers, ctx)
     ctx["free"] = set(providers.provider_id)
@@ -216,7 +216,7 @@ def generate(seed: int = S.SEED) -> dict:
     gt = []
     for inject in schemes.INJECTORS:
         claims = inject(claims, providers, members, gt, rng, ctx)
-    claims = finalize(claims, providers, ctx)
+    claims = finalize(schemes.drop_post_death(claims, members, gt), providers, ctx)
     assert len(claims) <= S.MAX_CLAIMS, len(claims)
     ground_truth = pd.DataFrame(gt, columns=["entity_id", "scheme", "start_date"])
     return {

@@ -38,10 +38,13 @@ def legit_outliers(claims, providers, rng, ctx) -> dict:
     parts = []
     for pid, n, codes, w in [(p, 250, ["96413", "J9271"], [.4, .6]) for p in onc] + \
                             [(p, 2500, ["99285", "99284", "99283"], [.5, .35, .15]) for p in er]:
-        mem = claims.member_id[claims.provider_id == pid].unique()
+        own = claims[claims.provider_id == pid]
+        mem = own.member_id.unique() if pid in onc else ctx["mem_by_cl"][ctx["pinfo"].cluster[pid]]
         sk = pd.DataFrame({"provider_id": pid, "member_id": rng.choice(mem, n), "cpt": rng.choice(codes, n, p=w),
                            "service_date": S.START + _days(rng, n)})
-        parts.append(sk.drop_duplicates(["member_id", "cpt", "service_date"]))
+        key = ["member_id", "cpt", "service_date"]
+        both = pd.concat([own[key], sk[key]], ignore_index=True)
+        parts.append(sk[~both.duplicated(key).values[len(own):]])
     table = pd.DataFrame({"entity_id": onc + er, "kind": ["high_cost_oncology"] * 4 + ["busy_er"] * 3})
     return {"claims": ctx["fill"](pd.concat(parts)), "ids": onc + er, "table": table}
 
@@ -194,6 +197,13 @@ def kickback_referral(claims, providers, members, gt, rng, ctx):
             gt.append((r, "kickback_referral", start))
         gt.append((recv, "kickback_referral", start))
     return pd.concat([claims, ctx["fill"](pd.concat(parts, ignore_index=True))], ignore_index=True)
+
+
+def drop_post_death(claims, members, gt) -> pd.DataFrame:
+    """Only phantom_services providers may bill after a member's date of death."""
+    phantom = [e for e, s, _ in gt if s == "phantom_services"]
+    dod = claims.member_id.map(members.set_index("member_id").dod)
+    return claims[~((claims.service_date > dod) & ~claims.provider_id.isin(phantom))]
 
 
 INJECTORS = [duplicate_billing, upcoding, unbundling, phantom_services, excessive_units,
