@@ -34,7 +34,7 @@ for col, step in zip(st.columns(5), [
          "actions are allowed."),
         ("queue", "views/2_Queue.py", "Queue", ":material/format_list_numbered:", "Cases are ranked to fit this "
          "week's investigator hours."),
-        ("decide", "views/6_Ledger.py", "Decide + prove", ":material/verified:", "A person signs the decision; the "
+        ("decide", "views/6_Ledger.py", "Decide", ":material/verified:", "A person signs the decision; the "
          "hash-chained ledger proves it.")]):
     with col:
         U.step_card(step[0], ["detect", "fuse", "policy", "queue", "decide"].index(step[0]) + 1, *step[1:])

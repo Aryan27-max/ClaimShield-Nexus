@@ -35,8 +35,8 @@ with U.card("authorisation"):
     ok, why, pm = MD.policy_status(pol)
     st.subheader("Authorisation (intent mandate)")
     U.html_line(U.chip("authorised" if ok else "not authorised", "green" if ok else "red"), why)
-    st.caption(f"Dual control: {', '.join(pol.get('dual_control_actions', [])) or 'none'} · automation may only route "
-               f"{', '.join(pol.get('automation_scope', [])) or 'nothing'} · program {pol.get('program', '—')} · record "
+    st.caption(f"Dual control: {', '.join(map(U.action_label, pol.get('dual_control_actions', []))) or 'none'} · automation may only route "
+               f"{', '.join(map(U.action_label, pol.get('automation_scope', []))) or 'nothing'} · program {pol.get('program', '—')} · record "
                f"retention {pol.get('record_retention_years', '—')} years (display only)")
     if ok and C.my_role() == "siu_lead":
         with st.expander("Revoke this policy version"):
@@ -56,6 +56,7 @@ with U.card("thresholds"):
     cols = st.columns(3)
     for i, (path, label) in enumerate(avail.items()):
         v, key = PE.get_threshold(pol, path), f"th_{path}_{pol['_hash'][:8]}"
+        label = G.THRESHOLD_LABELS.get(path, label)
         with cols[i % 3]:
             if isinstance(v, float) and v <= 1:
                 values[path] = st.slider(label, 0.0, 1.0, float(v), 0.01, key=key, help=G.THRESHOLD_HELP.get(path))

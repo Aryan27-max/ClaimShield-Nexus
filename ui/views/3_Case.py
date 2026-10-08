@@ -61,7 +61,7 @@ with tab_ev, U.card("evidence"):
         st.dataframe(ev[["claim_id", "field", "value", "expected", "class", "code", "entity_id"]],
                      hide_index=True, width="stretch", height=360, column_config={
                          "claim_id": st.column_config.TextColumn(width=85), "field": st.column_config.TextColumn(width=125),
-                         "value": st.column_config.TextColumn(width=190), "expected": st.column_config.TextColumn(width=285),
+                         "value": st.column_config.TextColumn(width=175), "expected": st.column_config.TextColumn(width=250),
                          "class": st.column_config.TextColumn(width=80), "code": st.column_config.TextColumn(width=50),
                          "entity_id": st.column_config.TextColumn("entity", width=85)})
     d = st.columns(3)

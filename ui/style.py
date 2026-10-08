@@ -83,7 +83,8 @@ def pyvis_colors() -> dict:
 def pyvis_css() -> str:
     """Network iframe: no loading bar, border in the theme's border colour."""
     return (f"<style>#loadingBar {{ display: none !important; }} #mynetwork {{ border: 1px solid {pal()['border']}"
-            f" !important; border-radius: 12px; }} body {{ background: {pal()['surface']}; }}</style>")
+            f" !important; border-radius: 12px; }} body {{ background: {pal()['surface']}; }} .card, .card-body {{ border: 0 !important;"
+            f" background: transparent !important; }}</style>")
 
 
 def edge_colors() -> dict:
@@ -114,7 +115,7 @@ h2, h3 {{ font-weight: 600 !important; letter-spacing: -0.015em; }}
 .cs-muted, [data-testid="stCaptionContainer"] {{ color: {v("text-2")} !important; }}
 #MainMenu, [data-testid="stMainMenu"], footer, [data-testid="stAppDeployButton"], [data-testid="stDecoration"] {{
   display: none !important; }}
-header[data-testid="stHeader"] {{ background: transparent; }}
+header[data-testid="stHeader"] {{ background: {v("bg")}; border-bottom: 1px solid {v("border")}; }}
 [data-testid="stSidebar"] {{ background: {v("sidebar")} !important;
   backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
   border-right: 1px solid {v("border")}; }}
@@ -141,7 +142,8 @@ button[data-testid^="stBaseButton-secondary"] {{ background: {v("surface")} !imp
   border: 1px solid {v("border-strong")} !important; }}
 div[class*="st-key-danger"] button {{ background: {v("danger-button")} !important; color: #fff !important;
   border: 1px solid transparent !important; }}
-.stButton button p, .stFormSubmitButton button p, .stDownloadButton button p {{ color: inherit !important; }}
+.stButton button :is(p, [data-testid="stMarkdownContainer"]), .stFormSubmitButton button :is(p, [data-testid="stMarkdownContainer"]),
+.stDownloadButton button :is(p, [data-testid="stMarkdownContainer"]) {{ color: inherit !important; }}
 .stButton button:hover, .stFormSubmitButton button:hover, .stDownloadButton button:hover {{ filter: brightness(1.06); }}
 .stButton button:active, .stFormSubmitButton button:active {{ transform: scale(.98); }}
 .stButton button:disabled, .stFormSubmitButton button:disabled {{ background: {v("neutral-bg")} !important;

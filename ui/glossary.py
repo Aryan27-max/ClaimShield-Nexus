@@ -52,3 +52,10 @@ THRESHOLD_HELP = {
     "actions.REFER_TO_MFCU.min_dollars": "Minimum dollars at risk for an MFCU referral.",
     "capacity.hours_per_investigator_week": "Working hours per investigator per week; sets queue capacity.",
 }
+
+THRESHOLD_LABELS = {  # display labels: plain action names instead of policy enums
+    "predictive.lift_min": "Predictive lift: 90-day forecast at least",
+    "actions.FULL_INVESTIGATION.min_conf": "Full investigation: min confidence",
+    "actions.REFER_TO_MFCU.min_conf": "Refer to MFCU: min confidence",
+    "actions.REFER_TO_MFCU.min_dollars": "Refer to MFCU: min $ at risk",
+}

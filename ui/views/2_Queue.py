@@ -59,19 +59,19 @@ with U.card("queue"):
         U.table_style(table, "recommended_action", "status"), hide_index=True, width="stretch", height=520,
         on_select="rerun", selection_mode="single-row",
         column_config={
-            "rank": st.column_config.NumberColumn("#", width=34),
-            "case_id": st.column_config.TextColumn("Case", width=92),
-            "recommended_action": st.column_config.TextColumn("Recommended", width=118,
+            "rank": st.column_config.NumberColumn("#", width=30),
+            "case_id": st.column_config.TextColumn("Case", width=84),
+            "recommended_action": st.column_config.TextColumn("Recommended", width=104,
                                                               help="Highest action the signed policy allows; a person decides"),
-            "p_fwa": st.column_config.ProgressColumn("Escalation", min_value=0, max_value=1, format="percent", width=90,
+            "p_fwa": st.column_config.ProgressColumn("Escalation", min_value=0, max_value=1, format="percent", width=80,
                                                      help="Calibrated chance of a strong alert or confirmed case within "
                                                           "the horizon (a forecast, never evidence)"),
-            "confidence": st.column_config.NumberColumn("Confidence", format="percent", step=0.001, width=75,
+            "confidence": st.column_config.NumberColumn("Confidence", format="percent", step=0.001, width=72,
                                                         help="Evidence confidence = fused score × data completeness"),
-            "classes": st.column_config.ListColumn("Evidence classes", width=178),
-            "dollars_at_risk": st.column_config.NumberColumn("$ at risk", format="dollar", step=1, width=100),
-            "status": st.column_config.TextColumn("Status", width=105),
-            "next_deadline": st.column_config.TextColumn("Next deadline", width=95,
+            "classes": st.column_config.ListColumn("Evidence classes", width=190),
+            "dollars_at_risk": st.column_config.NumberColumn("$ at risk", format="dollar", step=1, width=84),
+            "status": st.column_config.TextColumn("Status", width=92),
+            "next_deadline": st.column_config.TextColumn("Next due", width=80,
                                                          help="Earliest open compliance obligation"),
         })
     rows = event.selection.rows if event and hasattr(event, "selection") else []
