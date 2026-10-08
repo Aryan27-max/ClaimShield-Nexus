@@ -18,7 +18,7 @@ from core import schema as S
 from core.snapshots import HORIZONS, Z_COLS, GRAPH_COLS
 
 MODELS = S.ROOT / "models"
-TRAIN_END, CAL_START = pd.Timestamp("2024-12-31"), pd.Timestamp("2024-11-30")  # cal = last 2 train months
+TEST_START, CAL_MONTHS = pd.Timestamp("2025-01-31"), 2  # test = T >= TEST_START; cal = last 2 embargoed months
 PARAMS = dict(n_estimators=300, learning_rate=0.03, num_leaves=15, min_child_samples=30, subsample=0.8,
               subsample_freq=1, colsample_bytree=0.8, reg_lambda=1.0, num_threads=4, random_state=S.SEED, verbose=-1)
 FEATURES = (["n_3m", "paid_3m", "vol_trend", "paid_trend", "claims_cum", "paid_cum", "rule_flags_3m", "rule_flags_cum",
@@ -49,9 +49,14 @@ LABELS_EN = {
 
 
 def split(snap: pd.DataFrame, h: int) -> dict:
+    """Time split with an embargo: a fit/cal row is kept only if its label window (T, T+h] ends by the
+    next split's first T, so no training label sees events inside the calibration or test period."""
     lab = snap.dropna(subset=[f"label_{h}"])
-    return {"fit": lab[lab["T"] < CAL_START], "cal": lab[(lab["T"] >= CAL_START) & (lab["T"] <= TRAIN_END)],
-            "test": lab[lab["T"] > TRAIN_END]}
+    ends = lab["T"] + pd.Timedelta(days=h)
+    pre = lab[ends <= TEST_START]
+    cal_ts = sorted(pre["T"].unique())[-CAL_MONTHS:]
+    return {"fit": pre[ends[pre.index] <= cal_ts[0]], "cal": pre[pre["T"].isin(cal_ts)],
+            "test": lab[lab["T"] >= TEST_START]}
 
 
 def precision_at_k(df: pd.DataFrame, score: str, label: str, k: int = 20) -> float:
@@ -98,8 +103,8 @@ def _fmt(v) -> str:
 
 
 def params_hash() -> str:
-    return hashlib.sha256(json.dumps({"params": PARAMS, "features": FEATURES, "train_end": str(TRAIN_END),
-                                      "cal_start": str(CAL_START)}, sort_keys=True).encode()).hexdigest()
+    return hashlib.sha256(json.dumps({"params": PARAMS, "features": FEATURES, "test_start": str(TEST_START),
+                                      "cal_months": CAL_MONTHS, "embargo": "T+h <= next split start"}, sort_keys=True).encode()).hexdigest()
 
 
 def run_predict(snap: pd.DataFrame, save: bool = True) -> tuple[pd.DataFrame, dict]:

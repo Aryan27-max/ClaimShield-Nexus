@@ -85,12 +85,14 @@ flowchart LR
   H[Data with service_date <= T] --> FE[Provider x month-end snapshot T<br/>volume/paid + 3m trend, E/M hi share, units/claim, PMPM,<br/>new-member ratio, rule-flagged claims <= T, trailing peer z,<br/>graph @ quarter end <= T, investigations closed < T, type, tenure]
   FE --> M30[LightGBM h=30] & M60[LightGBM h=60] & M90[LightGBM h=90]
   LBL["Label(h): strong alert on claims in (T, T+h]<br/>OR confirmed investigation opened"] --> M30 & M60 & M90
-  M30 & M60 & M90 --> CAL[Isotonic on held-out train slice] --> S[p_fwa h + SHAP top-3 drivers]
+  M30 & M60 & M90 --> CAL[Isotonic on embargoed held-out slice] --> S[p_fwa h + SHAP top-3 drivers]
 ```
 - Snapshots from month 4 to the last T where T+h fits; latest snapshot (T = end of data) is scored for the queue.
 - Strong alert = deterministic/structural score >= 0.6 or anomaly score >= 0.86. Rule flags are bucketed by service month (rules are not re-run per snapshot).
-- Time split: fit T <= 2024-10, calibrate T in 2024-11..12, test T >= 2025-01. LightGBM num_threads=4, 300 trees, 15 leaves, seed 42. A `model_run` ledger block records params hash, ranges and metrics.
+- Time split with embargo: test T >= 2025-01-31; fit/calibration rows are kept only if T + h <= the next split's first T (calibration = last 2 eligible months), so no training label sees events in a later split. Per horizon: h=30 fit <= 2024-10, cal 2024-11..12; h=60 fit <= 2024-08, cal 2024-10..11; h=90 fit <= 2024-06, cal 2024-09..10. LightGBM num_threads=4, 300 trees, 15 leaves, seed 42. A `model_run` ledger block records params hash, ranges and metrics.
 - Leakage guard: a test rebuilds features from data truncated at T0 and asserts identical rows for every T <= T0.
+- **Positioning:** "The predictive lens is an early warning for providers WITHOUT flag history (new-onset). On already-flagged providers a naive persistence baseline is as good or better; we show both."
+- Known label limitation: strong-alert labels use whole-run alert scores (not re-scored per snapshot), so labels carry mild hindsight.
 - The forecast is **not evidence**: it stays out of evidence classes and confidence, never counts for FULL_INVESTIGATION / REFER_TO_MFCU, and can only lift a strong statistical-only case to PREPAY_REVIEW (policy `predictive.lift_min`, `predictive.statistical_min`). It drives queue `p_fwa(h)`.
 
 ## 6. Decision harness & human-in-the-loop

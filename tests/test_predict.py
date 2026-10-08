@@ -53,3 +53,13 @@ def test_time_split_has_no_overlap():
     snap = pd.read_parquet(S.OUT / "snapshots.parquet")
     sp = P.split(snap, 90)
     assert sp["fit"]["T"].max() < sp["cal"]["T"].min() <= sp["cal"]["T"].max() < sp["test"]["T"].min()
+
+
+def test_embargo_train_labels_end_before_next_split():
+    snap = pd.read_parquet(S.OUT / "snapshots.parquet")
+    for h in snapshots.HORIZONS:
+        sp = P.split(snap, h)
+        gap = pd.Timedelta(days=h)
+        assert len(sp["fit"]) and len(sp["cal"]) and len(sp["test"])
+        assert sp["fit"]["T"].max() + gap <= sp["cal"]["T"].min()
+        assert sp["cal"]["T"].max() + gap <= sp["test"]["T"].min()
