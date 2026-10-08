@@ -10,10 +10,11 @@ CLAIM_LEVEL = ("deterministic", "structural")
 MAX_EVIDENCE_PER_ALERT, MAX_EVIDENCE = 10, 80
 HORIZONS = [30, 60, 90]
 NO_MODEL_SCORE = "No model score for this provider (no snapshot); queue uses fused confidence."
-
-
-def load_alerts() -> pd.DataFrame:
-    return pd.concat([S.load(f"alerts_{n}") for n in ["rules", "anomaly", "graph"]], ignore_index=True)
+CASE_COLUMNS = (["case_id", "case_type", "providers", "provider_types", "n_providers", "classes", "n_classes"]
+                + [f"score_{c}" for c in CLASSES] + ["evidence_strength", "fused_score", "completeness", "confidence",
+                "alert_ids", "codes", "max_severity", "flagged_claim_ids", "n_flagged_claims", "dollars_at_risk"]
+                + [f"dollars_{c}" for c in CLASSES[:3]] + ["members_affected", "vulnerable_share", "member_harm_w",
+                                                         "limitations", "evidence"])
 
 
 def ring_map(graph_features: pd.DataFrame) -> pd.Series:
@@ -146,7 +147,7 @@ def build_cases(alerts: pd.DataFrame, t: dict, graph_features: pd.DataFrame, pol
            "member_age": pd.Series(((S.END - m.dob).dt.days / 365.25).values, index=m.member_id.astype(str))}
     members_of = rings.groupby(rings.values).apply(lambda s: sorted(s.index)).to_dict()
     rows = [_case(k, grp, members_of.get(k, [k]), ctx, prof, policy) for k, grp in a.groupby("case_id", sort=True)]
-    return add_predictive(pd.DataFrame(rows), preds)
+    return add_predictive(pd.DataFrame(rows, columns=CASE_COLUMNS), preds)
 
 
 def add_predictive(cases: pd.DataFrame, preds: pd.DataFrame | None) -> pd.DataFrame:

@@ -6,7 +6,7 @@ Full read of `core/`, `ui/`, `eval/`, `data/gen/`, `tests/` and `policy/` (sessi
 
 | # | File | Issue | Severity | Fix | Status |
 |---|---|---|---|---|---|
-| 1 | `core/fusion.py` | `build_cases` raises `AttributeError` when there are no alerts (for example, a clean data set). | bug | Return an empty case frame with the full column set. The UI then shows a "no cases" state. | open |
+| 1 | `core/fusion.py` | `build_cases` raises `AttributeError` when there are no alerts (for example, a clean data set). | bug | Return an empty case frame with the full column set. The UI then shows a "no cases" state. | fixed |
 | 2 | `core/harness.py` | Policy values are never validated. Negative hours give a negative weeks-to-clear, thresholds > 1 are accepted, and a missing key fails deep inside `evaluate` with `KeyError`. | bug | `validate_policy()` runs on load, preview and save, and lists every problem in one clear `ValueError`. | fixed |
 | 3 | `core/harness.py` | `save_version` fails with "max() arg is an empty sequence" in a folder without versions. Saving an unchanged policy creates a duplicate version. | bug | Start at v1 when the folder is empty, and reject a save with no threshold change. | fixed |
 | 4 | `core/harness.py` | An unsaved preview with zero changes gets a different hash from the active policy (same content, different hash). | bug | No changes ⇒ return the active policy and its hash. The hash is deterministic in content. | fixed |
@@ -29,7 +29,7 @@ Full read of `core/`, `ui/`, `eval/`, `data/gen/`, `tests/` and `policy/` (sessi
 | 21 | `core/predict.py` | `split()` raises a bare `IndexError` when history is too short for the embargoed calibration window. | cleanup | Explicit `ValueError` with the reason. | open |
 | 22 | `data/gen/schemes.py` | 268 lines (limit 250). | cleanup | Legit outliers and honest errors move to `data/gen/outliers.py`. Same RNG call order, so the data is byte-identical (verified by parquet hashes). | fixed |
 | 23 | `core/harness.py` | 246 lines; validation would push it past 250. | cleanup | Policy editing and versioning move to `core/policy_edit.py`. | fixed |
-| 24 | `core/fusion.py` | `load_alerts()` is never called. | cleanup | Removed. | open |
+| 24 | `core/fusion.py` | `load_alerts()` is never called. | cleanup | Removed. | fixed |
 | 25 | `core/queue.py`, `core/pipeline.py` | The `PREDICTIVE_AVAILABLE` flag is a P3 leftover that is always `True`. | cleanup | Removed. | open |
 
 ## Verified, no issue

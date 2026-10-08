@@ -193,7 +193,7 @@ def evaluate(case, policy: dict) -> dict:
 
 
 def evaluate_all(cases: pd.DataFrame, policy: dict) -> pd.DataFrame:
-    ev = pd.DataFrame([evaluate(r, policy) for _, r in cases.iterrows()], index=cases.index)
+    ev = pd.DataFrame([evaluate(r, policy) for _, r in cases.iterrows()], index=cases.index, columns=OUTPUT_COLS[:6])
     out = cases.join(ev)
     out["limitations"] = [[x for x in lim if x != PREDICTIVE_NOTE] + ([PREDICTIVE_NOTE] if drv else [])
                           for lim, drv in zip(out.limitations, out.predictive_driven)]

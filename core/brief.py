@@ -101,9 +101,12 @@ def network(case, providers: pd.DataFrame, gf: pd.DataFrame) -> list[str]:
     g = gf.assign(provider_id=gf.provider_id.astype(str)).set_index("provider_id")
     out = []
     if case["case_type"] == "ring":
-        r = g.loc[pids[0]]
-        out.append(f"Ring {case['case_id']}: {len(pids)} providers; Louvain community {r.community_id} "
-                   f"(size {int(r.community_size)}, density {r.community_density:.2f}).")
+        comms = g.loc[pids].groupby("community_id").agg(members=("community_size", "size"),
+                                                         comm_size=("community_size", "first"),
+                                                         density=("community_density", "first"))
+        out.append(f"Ring {case['case_id']}: {len(pids)} providers; Louvain communities: " + "; ".join(
+            f"{cid} (size {int(r['comm_size'])}, density {r['density']:.2f}) holds {int(r['members'])} of them"
+            for cid, r in comms.iterrows()) + ".")
     rows = []
     for pid in pids:
         pr, r = p.loc[pid], g.loc[pid]
