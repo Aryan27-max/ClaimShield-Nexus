@@ -53,3 +53,15 @@ def test_save_requires_author_and_reason(base, tmp_path):
     _, pol = base
     with pytest.raises(ValueError):
         harness.save_version(pol, "", "x", old=pol, folder=tmp_path, db=tmp_path / "l.db")
+
+
+def test_preview_has_no_side_effects(base):
+    cases, pol = base
+    folder = S.POLICY.parent
+    before_files = sorted(p.name for p in folder.iterdir())
+    before_v1, n_ledger = S.POLICY.read_bytes(), len(ledger.read())
+    new = harness.with_thresholds(pol, DEMO_THRESHOLDS)
+    harness.diff(cases, pol, new)
+    validation(harness.evaluate_all(cases.drop(columns=harness.OUTPUT_COLS), new))
+    assert sorted(p.name for p in folder.iterdir()) == before_files and S.POLICY.read_bytes() == before_v1
+    assert len(ledger.read()) == n_ledger

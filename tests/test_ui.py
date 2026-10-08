@@ -87,4 +87,38 @@ def test_policy_preview_shows_changes(tmp_ledger):
     at.button(key="preview").click().run()
     assert not at.exception, [e.value for e in at.exception]
     assert any("case(s) change action" in m.value for m in list(at.markdown) + list(at.subheader))
+    tiles = [m.value for m in at.markdown if "cs-tile" in m.value]
+    assert any("Upcoding providers at PREPAY+" in t and ">1 → 5<" in t for t in tiles)
+    assert any("Clean providers escalated" in t and ">0 → 0<" in t for t in tiles)
     assert len(ledger.read(tmp_ledger)) == 0
+
+
+def test_queue_open_case_renders_case_page(tmp_ledger):
+    at = _app("pages/2_Queue.py")
+    first = at.selectbox[0].value
+    next(b for b in at.button if b.label == "Open case").click()
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert at.title[0].value == f"Case {first}"
+
+
+def test_horizon_and_investigators_rerank(tmp_ledger):
+    at = _app("pages/2_Queue.py")  # AppTest runs only the page after switch_page: drive the sidebar state directly
+    for h, n in [(30, 3), (60, 5), (90, 10)]:
+        at.session_state["horizon"], at.session_state["investigators"] = h, n
+        at.run()
+        assert not at.exception, [e.value for e in at.exception]
+        assert any(f"{n} investigators · {30 * n} h this week · {h}-day horizon" in m.value for m in at.markdown)
+
+
+def test_ledger_ui_tamper_then_verify_shows_broken_block(tmp_ledger):
+    for i in range(3):
+        ledger.append("system:test", "probe", {"i": i}, tmp_ledger)
+    at = _app("pages/6_Ledger.py")
+    at.number_input[0].set_value(1)
+    next(b for b in at.button if b.label == "Simulate tamper").click()
+    at.run()
+    at.button(key="verify").click()
+    at.run()
+    assert not at.exception
+    assert any("broken at block 1" in m.value for m in at.markdown)

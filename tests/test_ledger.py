@@ -51,3 +51,22 @@ def test_reset_starts_fresh_chain(db):
     assert ledger.read(db).empty
     ledger.append("tester", "event", {"i": 0}, db)
     assert ledger.read(db).prev_hash.iloc[0] == ledger.GENESIS and ledger.verify(db) == (True, None)
+
+
+EVENTS = ["lens_run", "model_run", "fusion_run", "policy_change", "brief_generated", "human_decision"]
+
+
+@pytest.mark.parametrize("idx", range(len(EVENTS)), ids=EVENTS)
+def test_tamper_on_each_event_type_detected_at_exact_block(tmp_path, idx):
+    path = tmp_path / "events.db"
+    for i, e in enumerate(EVENTS):
+        ledger.append("system:test" if i < 3 else "human:alice", e, {"i": i, "event": e}, path)
+    assert ledger.verify(path) == (True, None)
+    ledger.tamper(idx, path)
+    assert ledger.verify(path) == (False, idx)
+    assert json.loads(ledger.read(path).payload_json[idx])["_tampered"] is True
+
+
+def test_verify_on_empty_ledger(tmp_path):
+    path = tmp_path / "empty.db"
+    assert ledger.read(path).empty and ledger.verify(path) == (True, None)
