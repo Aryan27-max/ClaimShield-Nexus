@@ -82,12 +82,16 @@ Signals: Louvain community density, shared owner/address/bank, referral reciproc
 ## 5. Prediction (lens 4)
 ```mermaid
 flowchart LR
-  H[History before snapshot T] --> FE[Provider features<br/>volume trend, E/M mix, rule hits,<br/>anomaly z, graph centrality,<br/>past outcomes]
+  H[Data with service_date <= T] --> FE[Provider x month-end snapshot T<br/>volume/paid + 3m trend, E/M hi share, units/claim, PMPM,<br/>new-member ratio, rule-flagged claims <= T, trailing peer z,<br/>graph @ quarter end <= T, investigations closed < T, type, tenure]
   FE --> M30[LightGBM h=30] & M60[LightGBM h=60] & M90[LightGBM h=90]
-  LBL[Label: confirmed/new FWA in T..T+h] --> M30 & M60 & M90
-  M30 & M60 & M90 --> CAL[Isotonic calibration] --> S[P_fwa + SHAP top drivers]
+  LBL["Label(h): strong alert on claims in (T, T+h]<br/>OR confirmed investigation opened"] --> M30 & M60 & M90
+  M30 & M60 & M90 --> CAL[Isotonic on held-out train slice] --> S[p_fwa h + SHAP top-3 drivers]
 ```
-Time-based split (train on earlier snapshots, test on later) to avoid leakage.
+- Snapshots from month 4 to the last T where T+h fits; latest snapshot (T = end of data) is scored for the queue.
+- Strong alert = deterministic/structural score >= 0.6 or anomaly score >= 0.86. Rule flags are bucketed by service month (rules are not re-run per snapshot).
+- Time split: fit T <= 2024-10, calibrate T in 2024-11..12, test T >= 2025-01. LightGBM num_threads=4, 300 trees, 15 leaves, seed 42. A `model_run` ledger block records params hash, ranges and metrics.
+- Leakage guard: a test rebuilds features from data truncated at T0 and asserts identical rows for every T <= T0.
+- The forecast is **not evidence**: it stays out of evidence classes and confidence, never counts for FULL_INVESTIGATION / REFER_TO_MFCU, and can only lift a strong statistical-only case to PREPAY_REVIEW (policy `predictive.lift_min`, `predictive.statistical_min`). It drives queue `p_fwa(h)`.
 
 ## 6. Decision harness & human-in-the-loop
 ```mermaid

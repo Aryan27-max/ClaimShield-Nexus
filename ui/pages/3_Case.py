@@ -31,7 +31,24 @@ if r.recommended_action == "NEEDS_MORE_DATA":
 if r.requires_human:
     st.info("REFER_TO_MFCU is allowed for this case and always requires a human decision.")
 
-tab_ev, tab_tl, tab_net, tab_why = st.tabs(["Evidence", "Timeline", "Network", "Why this action"])
+tab_ev, tab_risk, tab_tl, tab_net, tab_why = st.tabs(["Evidence", "Risk forecast", "Timeline", "Network",
+                                                     "Why this action"])
+
+with tab_risk:
+    if r.has_model_score:
+        hs = [30, 60, 90]
+        fig = go.Figure(go.Bar(x=[f"{h} days" for h in hs], y=[r[f"p_{h}"] for h in hs], marker_color="#0071E3",
+                               text=[f"{r[f'p_{h}']:.0%}" for h in hs], textposition="outside"))
+        fig.update_layout(height=280, yaxis=dict(range=[0, 1.1], tickformat=".0%", title="P(escalation)"),
+                          margin=dict(l=10, r=10, t=10, b=10))
+        st.plotly_chart(fig, width="stretch")
+        st.markdown(f"**Top drivers** (provider {r.driver_provider}, latest snapshot):")
+        for d in r.drivers:
+            st.markdown(f"- {d['label'].capitalize()}: **{d['value']}**")
+        st.caption("Calibrated LightGBM forecast of a strong alert or confirmed investigation within the horizon. "
+                   "A forecast is not evidence: it never counts toward FULL_INVESTIGATION or MFCU.")
+    else:
+        st.info("No model score for this provider; the queue uses fused confidence.")
 
 with tab_ev:
     ev = pd.DataFrame(list(r.evidence))

@@ -1,4 +1,4 @@
-"""run_all(): rules -> anomaly -> graph -> fusion -> harness -> data/out/cases.parquet + ledger batch entries.
+"""run_all(): rules -> anomaly -> graph -> snapshots + predict -> fusion -> harness -> data/out/cases.parquet + ledger batch entries.
 Run: python -m core.pipeline [--reset-ledger]"""
 import argparse
 import hashlib
@@ -7,7 +7,7 @@ import time
 
 import pandas as pd
 
-from core import anomaly, fusion, graph, harness, ledger, rules
+from core import anomaly, fusion, graph, harness, ledger, predict, rules, snapshots
 from core import queue as Q
 from core import schema as S
 
@@ -65,10 +65,20 @@ def run_all(reset_ledger: bool = False, policy_path=None) -> dict:
     anomaly.log_run(aa, sc, timings["anomaly"])
     graph.log_run(ag, gf, timings["graph"])
 
+    alerts = pd.concat([ar, aa, ag], ignore_index=True)
+    t1 = time.time()
+    snap = snapshots.build(t, ar, alerts)
+    snap.to_parquet(S.OUT / "snapshots.parquet", index=False)
+    timings["snapshots"] = time.time() - t1
+    t1 = time.time()
+    preds, report = predict.run_predict(snap)
+    preds.to_parquet(S.OUT / "predictions.parquet", index=False)
+    timings["predict"] = time.time() - t1
+    predict.log_run(report, timings["predict"])
+
     t1 = time.time()
     policy = harness.load_policy(policy_path)
-    alerts = pd.concat([ar, aa, ag], ignore_index=True)
-    cases = harness.evaluate_all(fusion.build_cases(alerts, t, gf, policy), policy)
+    cases = harness.evaluate_all(fusion.build_cases(alerts, t, gf, policy, preds), policy)
     cases.to_parquet(S.CASES, index=False)
     timings["fusion_harness"] = time.time() - t1
 
@@ -77,6 +87,7 @@ def run_all(reset_ledger: bool = False, policy_path=None) -> dict:
             "actions": cases.recommended_action.value_counts().to_dict(),
             "policy_version": policy["version"], "policy_hash": policy["_hash"], "policy_path": policy["_path"],
             "cases_merkle_root": merkle_root(leaves), "n_cases": len(cases),
+            "model_params_hash": predict.params_hash(), "model_test": {h: r["test"] for h, r in report.items()},
             "predictive_available": Q.PREDICTIVE_AVAILABLE, "asof": str(S.END.date())}
     entry = ledger.append("system:pipeline", "fusion_run", meta)
     timings["total"] = time.time() - t0

@@ -18,7 +18,7 @@ def test_run_all_under_60s(tmp_path, monkeypatch):
     cases = pd.read_parquet(S.CASES)
     assert len(cases) == meta["n_cases"] and cases.case_id.is_unique
     lg = ledger.read(tmp_path / "l.db")
-    assert list(lg.event_type) == ["lens_run"] * 3 + ["fusion_run"]
+    assert list(lg.event_type) == ["lens_run"] * 3 + ["model_run", "fusion_run"]
     assert ledger.verify(tmp_path / "l.db") == (True, None)
 
 

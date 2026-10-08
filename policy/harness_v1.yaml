@@ -17,9 +17,15 @@ abstain:
   statistical_min: 0.6     # statistical-only cases below this fused score => NEEDS_MORE_DATA
   min_completeness: 0.6    # data too thin to act => NEEDS_MORE_DATA
 
+# Predictive (forecast) never counts as an independent class for FULL / MFCU. It may lift a statistical-only
+# case past the statistical abstain rule to PREPAY_REVIEW when both thresholds hold.
+predictive:
+  lift_min: 0.7            # calibrated p_fwa(90)
+  statistical_min: 0.75    # statistical class score
+
 # Checked top-down; recommended = highest action whose conditions all pass.
 # Keys: min_classes, min_conf, min_dollars, max_dollars, min_severity, max_severity,
-#       classes_any, classes_all, codes_any, min_class_score, any_of (list of condition blocks).
+#       classes_any, classes_all, codes_any, min_class_score, predictive_lift, any_of (list of condition blocks).
 actions:
   REFER_TO_MFCU:
     requires_human: true
@@ -35,10 +41,10 @@ actions:
       - {classes_any: [deterministic], min_severity: 4, min_dollars: 5000}
       - {classes_any: [deterministic], min_severity: 5}
   PREPAY_REVIEW:
-    min_conf: 0.55
     any_of:
-      - {classes_any: [deterministic, structural]}
-      - {codes_any: ["AN:em_hi_share"], min_class_score: {statistical: 0.85}}
+      - {classes_any: [deterministic, structural], min_conf: 0.55}
+      - {codes_any: ["AN:em_hi_share"], min_class_score: {statistical: 0.85}, min_conf: 0.55}
+      - {predictive_lift: true}
   PROVIDER_EDUCATION:
     max_dollars: 5000
     max_severity: 3

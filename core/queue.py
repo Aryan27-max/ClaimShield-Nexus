@@ -1,12 +1,15 @@
 """Capacity-aware SIU queue: priority score + greedy fill of investigator hours; overflow is deferred, never dropped."""
 import pandas as pd
 
-PREDICTIVE_AVAILABLE = False  # P5 replaces p_fwa(h) with the calibrated 30/60/90 model
+PREDICTIVE_AVAILABLE = True
 
 
 def p_fwa(cases: pd.DataFrame, horizon: int = 90) -> pd.Series:
-    """P(FWA within horizon). Until the predictive lens exists, the fused confidence stands in for every horizon."""
-    return cases.confidence.astype(float)
+    """Calibrated model P(escalation within horizon); fused confidence only where the provider has no snapshot."""
+    col = f"p_{horizon}"
+    if col not in cases:
+        return cases.confidence.astype(float)
+    return cases[col].astype(float).fillna(cases.confidence.astype(float))
 
 
 def _must_take(q: pd.DataFrame, policy: dict) -> pd.Series:

@@ -1,5 +1,6 @@
 """P3 exit check: funnel, top queue, action matrix by ground-truth label, policy invariants, runtime.
 Eval may read ground_truth / legit_outliers; the pipeline may not. Run: python -m eval.pipeline_check"""
+import copy
 import sys
 
 import pandas as pd
@@ -59,6 +60,16 @@ def checks(cases: pd.DataFrame, mat: pd.DataFrame, m: pd.DataFrame, policy: dict
     return out
 
 
+def upcoding_at_prepay(cases: pd.DataFrame, policy: dict, **predictive) -> int:
+    """Upcoding entities at PREPAY_REVIEW+ when re-evaluated with the given predictive thresholds."""
+    pol = copy.deepcopy(policy)
+    pol["predictive"].update(predictive)
+    base = cases.drop(columns=["allowed_actions", "recommended_action", "rule_trace", "requires_human",
+                               "missing_classes", "predictive_driven", "est_hours", "policy_version", "policy_hash"])
+    mat, _ = action_matrix(harness.evaluate_all(base, pol))
+    return int(mat.loc["upcoding", HIGH].sum())
+
+
 def main() -> int:
     meta = pipeline.run_all()
     cases, policy = pd.read_parquet(S.CASES), harness.load_policy()
@@ -72,6 +83,11 @@ def main() -> int:
                       "members_affected", "est_hours", "priority", "status"]].to_string(index=False))
     mat, m = action_matrix(cases)
     print(mat.to_string())
+    pr = policy["predictive"]
+    print(f"upcoding at PREPAY+: before (no predictive lift) {upcoding_at_prepay(cases, policy, lift_min=2.0)} -> "
+          f"after (policy lift_min {pr['lift_min']}, statistical_min {pr['statistical_min']}) "
+          f"{upcoding_at_prepay(cases, policy)}; sensitivity lift_min 0.6 + statistical_min 0.55 -> "
+          f"{upcoding_at_prepay(cases, policy, lift_min=0.6, statistical_min=0.55)}")
     res = checks(cases, mat, m, policy, meta["timings"]["total"])
     for name, ok in res:
         print(("PASS " if ok else "FAIL ") + name)

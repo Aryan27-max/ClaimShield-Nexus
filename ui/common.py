@@ -16,7 +16,7 @@ from core import queue as Q  # noqa: E402
 from core import schema as S  # noqa: E402
 
 HARNESS_COLS = ["allowed_actions", "recommended_action", "rule_trace", "requires_human", "missing_classes",
-                "est_hours", "policy_version", "policy_hash"]
+                "predictive_driven", "est_hours", "policy_version", "policy_hash"]
 FOOTER = "Recommendation only — final action requires a human decision."
 KIND_COLOR = {"provider": "#4C78A8", "member": "#BAB0AC", "owner": "#F58518", "address": "#54A24B", "bank": "#B279A2"}
 

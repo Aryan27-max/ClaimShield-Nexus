@@ -8,6 +8,8 @@ from core import schema as S
 CLASSES = ["deterministic", "structural", "statistical", "predictive"]
 CLAIM_LEVEL = ("deterministic", "structural")
 MAX_EVIDENCE_PER_ALERT, MAX_EVIDENCE = 10, 80
+HORIZONS = [30, 60, 90]
+NO_MODEL_SCORE = "No model score for this provider (no snapshot); queue uses fused confidence."
 
 
 def load_alerts() -> pd.DataFrame:
@@ -87,7 +89,6 @@ def _limitations(classes: set, codes: set, n_det_claims: int, prof: pd.DataFrame
                    else f"{k} of {n} providers have no referral data.")
     if is_ring:
         lim.append(f"Ring case covering {n} providers; individual roles not yet established.")
-    lim.append("Predictive lens not yet available; confidence uses fused evidence only.")
     return lim
 
 
@@ -131,7 +132,8 @@ def _case(cid: str, grp: pd.DataFrame, providers: list[str], t: dict, prof: pd.D
     }
 
 
-def build_cases(alerts: pd.DataFrame, t: dict, graph_features: pd.DataFrame, policy: dict) -> pd.DataFrame:
+def build_cases(alerts: pd.DataFrame, t: dict, graph_features: pd.DataFrame, policy: dict,
+                preds: pd.DataFrame | None = None) -> pd.DataFrame:
     """One row per case; `t` needs claims, providers, members, referrals."""
     rings = ring_map(graph_features)
     a = assign_cases(alerts, rings, policy["class_map"])
@@ -144,7 +146,26 @@ def build_cases(alerts: pd.DataFrame, t: dict, graph_features: pd.DataFrame, pol
            "member_age": pd.Series(((S.END - m.dob).dt.days / 365.25).values, index=m.member_id.astype(str))}
     members_of = rings.groupby(rings.values).apply(lambda s: sorted(s.index)).to_dict()
     rows = [_case(k, grp, members_of.get(k, [k]), ctx, prof, policy) for k, grp in a.groupby("case_id", sort=True)]
-    return pd.DataFrame(rows)
+    return add_predictive(pd.DataFrame(rows), preds)
+
+
+def add_predictive(cases: pd.DataFrame, preds: pd.DataFrame | None) -> pd.DataFrame:
+    """p_30/60/90 = max over the case's providers; drivers from the riskiest provider. The predictive score is
+    kept apart from `classes`/confidence: it is a forecast that shares data with the statistical class."""
+    c = cases.copy()
+    pv = preds.pivot_table(index="provider_id", columns="h", values="p_fwa") if preds is not None and len(preds) \
+        else pd.DataFrame(columns=HORIZONS, dtype=float)
+    drv = preds[preds.h == 90].set_index("provider_id").drivers if preds is not None and len(preds) else pd.Series()
+    for h in HORIZONS:
+        c[f"p_{h}"] = c.providers.map(lambda ps: pv[h].reindex(list(ps)).max() if h in pv else np.nan).astype(float)
+    best = c.providers.map(lambda ps: pv[90].reindex(list(ps)).idxmax()
+                           if 90 in pv and pv[90].reindex(list(ps)).notna().any() else None)
+    c["driver_provider"] = best
+    c["drivers"] = best.map(lambda b: list(drv[b]) if b is not None and b in drv.index else [])
+    c["has_model_score"] = c.p_90.notna()
+    c["score_predictive"] = c.p_90.fillna(0.0).round(3)
+    c["limitations"] = [list(lim) + ([] if ok else [NO_MODEL_SCORE]) for lim, ok in zip(c.limitations, c.has_model_score)]
+    return c
 
 
 def funnel(alerts: pd.DataFrame, cases: pd.DataFrame) -> dict:

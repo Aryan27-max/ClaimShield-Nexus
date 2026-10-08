@@ -30,10 +30,22 @@ def load_policy(path: Path | str | None = None) -> dict:
     return pol
 
 
+PREDICTIVE_NOTE = "Recommendation relies on the predictive model plus peer comparison; no rule or network evidence."
+
+
+def _lift(case, pr: dict) -> tuple[str, bool]:
+    sp, ss = float(case.get("score_predictive", 0.0)), float(case["score_statistical"])
+    ok = list(case["classes"]) == ["statistical"] and sp >= pr["lift_min"] and ss >= pr["statistical_min"]
+    return (f"predictive lift: statistical-only, p_fwa(90) {sp:.2f} >= {pr['lift_min']} & "
+            f"statistical {ss:.2f} >= {pr['statistical_min']}", ok)
+
+
 def _cond(key: str, v, case) -> tuple[str, bool]:
     classes, codes = list(case["classes"]), list(case["codes"])
     conf, usd, sev = float(case["confidence"]), float(case["dollars_at_risk"]), int(case["max_severity"])
     match key:
+        case "predictive_lift":
+            return _lift(case, case["_pred"])
         case "min_classes":
             return f"evidence classes {len(classes)} >= {v}", len(classes) >= v
         case "min_conf":
@@ -81,18 +93,23 @@ def est_hours(action: str, n_providers: int, policy: dict) -> float:
 
 def evaluate(case, policy: dict) -> dict:
     """allowed_actions (high -> low), recommended_action, rule_trace (why not higher), missing_classes."""
+    case = {**dict(case), "_pred": policy.get("predictive", {"lift_min": 2.0, "statistical_min": 2.0})}
     ab, classes = policy["abstain"], list(case["classes"])
     missing = [c for c in EVIDENCE_CLASSES if c not in classes]
     stat_only = classes == ["statistical"]
+    lift_desc, lift = _lift(case, case["_pred"])
     trace = []
     if case["completeness"] < ab["min_completeness"]:
         trace.append(f"abstain: data completeness {case['completeness']:.2f} < {ab['min_completeness']} → fail")
-    if stat_only and case["fused_score"] < ab["statistical_min"]:
+    if stat_only and case["fused_score"] < ab["statistical_min"] and lift:
+        trace.append(f"abstain bypassed by {lift_desc} → pass")
+    elif stat_only and case["fused_score"] < ab["statistical_min"]:
         trace.append(f"abstain: only statistical evidence and fused score {case['fused_score']:.2f} "
                      f"< statistical_min {ab['statistical_min']} → fail")
-    if trace:
+    if any(t.startswith("abstain:") for t in trace):
         return {"allowed_actions": list(SAFE), "recommended_action": "NEEDS_MORE_DATA", "requires_human": False,
-                "rule_trace": trace + [f"{a}: blocked by abstain rule" for a in ESCALATING], "missing_classes": missing}
+                "rule_trace": trace + [f"{a}: blocked by abstain rule" for a in ESCALATING], "missing_classes": missing,
+                "predictive_driven": False}
     allowed = []
     for a in ESCALATING:
         checks = _check(policy["actions"][a], case)
@@ -105,12 +122,14 @@ def evaluate(case, policy: dict) -> dict:
         trace.append(f"no escalating action passed → {rec}")
     return {"allowed_actions": allowed + SAFE, "recommended_action": rec, "rule_trace": trace,
             "requires_human": any(policy["actions"][a].get("requires_human", False) for a in allowed),
-            "missing_classes": missing}
+            "missing_classes": missing, "predictive_driven": bool(lift and rec == "PREPAY_REVIEW")}
 
 
 def evaluate_all(cases: pd.DataFrame, policy: dict) -> pd.DataFrame:
     ev = pd.DataFrame([evaluate(r, policy) for _, r in cases.iterrows()], index=cases.index)
     out = cases.join(ev)
+    out["limitations"] = [[x for x in lim if x != PREDICTIVE_NOTE] + ([PREDICTIVE_NOTE] if drv else [])
+                          for lim, drv in zip(out.limitations, out.predictive_driven)]
     out["est_hours"] = [est_hours(a, n, policy) for a, n in zip(out.recommended_action, out.n_providers)]
     out["policy_version"], out["policy_hash"] = policy["version"], policy["_hash"]
     return out

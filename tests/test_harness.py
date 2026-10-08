@@ -12,7 +12,7 @@ def _case(case_id="P9999", classes=("deterministic",), conf=0.9, usd=10_000.0, s
     scores.update({f"score_{c}": conf for c in classes})
     return {"case_id": case_id, "classes": list(classes), "codes": list(codes), "confidence": conf,
             "fused_score": conf, "completeness": 1.0, "dollars_at_risk": usd, "max_severity": sev,
-            "n_providers": 1, "member_harm_w": 1.0, **scores, **kw}
+            "n_providers": 1, "member_harm_w": 1.0, "limitations": [], **scores, **kw}
 
 
 def _cases(*rows) -> pd.DataFrame:
@@ -89,3 +89,17 @@ def test_must_take_fills_first_and_flags_over_capacity():
     assert (q.status[q.must_take] == "in_capacity").sum() == 2 and (q.status == "over_capacity").sum() == 1
     assert "deferred" not in set(q.status[q.must_take])
     assert q.attrs["weeks_to_clear"] == round(q.est_hours[q.queued].sum() / 25, 1)
+
+
+def test_predictive_lift_only_for_strong_statistical_only():
+    stat = dict(classes=("statistical",), conf=0.5, codes=("AN:new_member_ratio",))
+    lifted = harness.evaluate(_case(**stat, score_statistical=0.8, score_predictive=0.9), POLICY)
+    weak = harness.evaluate(_case(**stat, score_statistical=0.6, score_predictive=0.9), POLICY)
+    assert lifted["recommended_action"] == "PREPAY_REVIEW" and lifted["predictive_driven"]
+    assert weak["recommended_action"] == "NEEDS_MORE_DATA"
+    assert harness.PREDICTIVE_NOTE in _cases(_case(**stat, score_statistical=0.8, score_predictive=0.9)).limitations[0]
+
+
+def test_predictive_never_counts_toward_mfcu():
+    ev = harness.evaluate(_case(conf=0.95, usd=90_000, sev=5, score_predictive=1.0), POLICY)
+    assert "REFER_TO_MFCU" not in ev["allowed_actions"]

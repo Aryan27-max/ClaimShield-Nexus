@@ -24,7 +24,7 @@ with st.sidebar:
     st.selectbox("Policy version", files, key="policy_path",
                  format_func=lambda p: f"v{C.policy(p)['version']} · {Path(p).stem} · {C.policy(p)['_hash'][:10]}")
     st.segmented_control("Risk horizon (days)", [30, 60, 90], default=90, key="horizon")
-    st.caption(":orange-badge[predictive lens pending — using fused confidence]")
+    st.caption("Queue uses the calibrated escalation model for this horizon.")
     st.slider("Investigators", 1, 10, value=pol["capacity"]["investigators"], key="investigators")
     st.caption(f"{pol['capacity']['hours_per_investigator_week']} h per investigator per week")
     if st.button("Re-run pipeline", help="Not needed for normal use; sliders only re-rank."):
