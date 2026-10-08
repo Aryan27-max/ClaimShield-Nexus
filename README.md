@@ -58,7 +58,7 @@ Medicaid program-integrity teams get far more fraud, waste and abuse (FWA) signa
 
 ## Screenshots
 
-Light mode shown. The app follows each visitor's system light/dark setting (black logo in light mode, white logo in dark mode) and switches live if the setting changes.
+Light and dark themes: the app follows the visitor's system setting, and the **Light / Dark** toggle at the top of the sidebar overrides it (kept in the URL across pages and refreshes). Body text meets WCAG AA contrast in both themes (enforced by `tests/test_contrast.py`).
 
 <table>
   <tr>
@@ -72,6 +72,17 @@ Light mode shown. The app follows each visitor's system light/dark setting (blac
   <tr>
     <td><img src="docs/img/policy.png" alt="Policy page"><br><sub><b>Policy</b> — humans edit thresholds, preview the impact, then save a new hashed version.</sub></td>
     <td><img src="docs/img/ledger.png" alt="Audit ledger page"><br><sub><b>Audit Ledger</b> — SHA-256 hash chain plus Ed25519 signature verification of every mandate.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/img/overview.png" alt="Overview page, light theme"><br><sub><b>Light</b> — Overview.</sub></td>
+    <td><img src="docs/img/dark/overview.png" alt="Overview page, dark theme"><br><sub><b>Dark</b> — Overview.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/img/dark/case.png" alt="Case page, dark theme"><br><sub><b>Dark</b> — ring case, Compliance tab.</sub></td>
+    <td><img src="docs/img/dark/network.png" alt="Network page, dark theme"><br><sub><b>Dark</b> — Network.</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/img/dark/ledger.png" alt="Audit ledger page, dark theme" width="50%"><br><sub><b>Dark</b> — Audit Ledger after Verify signatures.</sub></td>
   </tr>
 </table>
 
