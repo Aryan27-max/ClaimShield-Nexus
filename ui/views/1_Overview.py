@@ -75,7 +75,7 @@ else:
     with c1, U.card("recall"):
         st.subheader("Recall per planted scheme")
         rc = M.recall(q, lab)
-        fig = go.Figure([go.Bar(x=rc.scheme, y=rc.any_case, name="Any case", marker_color=U.pal()["accent_soft"]),
+        fig = go.Figure([go.Bar(x=rc.scheme, y=rc.any_case, name="Any case", marker_color=U.pal()["accent-soft"]),
                          go.Bar(x=rc.scheme, y=rc.prepay_plus, name="Prepay review or higher", marker_color=U.ACCENT)])
         fig.update_layout(template=U.plotly_template(), barmode="group", height=320, yaxis=dict(tickformat=".0%"))
         U.plot(fig)

@@ -95,7 +95,7 @@ with tab_tl, U.card("timeline"):
     c = c.assign(month=c.service_date.dt.to_period("M").dt.to_timestamp(),
                  flagged=c.claim_id.isin(set(r.flagged_claim_ids)))
     tl = c.groupby(["month", "flagged"]).paid_amt.sum().unstack(fill_value=0).reindex(columns=[False, True], fill_value=0)
-    fig = go.Figure([go.Bar(x=tl.index, y=tl[False], name="Paid (not flagged)", marker_color=U.pal()["accent_soft"]),
+    fig = go.Figure([go.Bar(x=tl.index, y=tl[False], name="Paid (not flagged)", marker_color=U.pal()["accent-soft"]),
                      go.Bar(x=tl.index, y=tl[True], name="Paid (flagged)", marker_color=U.RED)])
     fig.update_layout(template=U.plotly_template(), barmode="stack", height=360, yaxis_title="Paid $ per month")
     U.plot(fig)

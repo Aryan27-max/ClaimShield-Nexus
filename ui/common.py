@@ -130,14 +130,16 @@ def ego_html(entity_id: str, highlight: list[str], max_nodes: int = 150) -> tupl
     from pyvis.network import Network
     G, gf = graph_obj(_mtime(S.OUT / "claims.parquet"))
     sub = graph.ego_graph(entity_id, max_nodes=max_nodes, G=G, graph_features=gf)
-    net = Network(height="520px", width="100%", cdn_resources="in_line", bgcolor=U.pal()["card"], font_color=U.pal()["text"])
+    pc = U.pyvis_colors()
+    net = Network(height="520px", width="100%", cdn_resources="in_line", bgcolor=pc["bg"], font_color=pc["font"])
     for n, d in sub.nodes(data=True):
         kind = d.get("kind", "?")
         hot = n in highlight
         net.add_node(n, label=n if kind != "member" else "",
                      title=f"{kind} {phi.token(n) if kind == 'member' else n} {d.get('type', '')}",
-                     color=U.NODE_COLORS["highlight"] if hot else U.NODE_COLORS.get(kind, U.GRAY), size=22 if hot else (8 if kind == "member" else 14))
-    hl, edges = set(highlight), U.edge_colors()
+                     color=pc["nodes"]["highlight"] if hot else pc["nodes"].get(kind, U.GRAY),
+                     size=22 if hot else (8 if kind == "member" else 14))
+    hl, edges = set(highlight), pc["edges"]
     for u, v, d in sub.edges(data=True):
         rel, inner, touches = d.get("rel", ""), u in hl and v in hl, u in hl or v in hl
         if rel == "refers":

@@ -30,6 +30,8 @@ PAGES = [st.Page("views/1_Overview.py", title="Overview", icon=":material/insigh
 nav = st.navigation(PAGES)
 
 with st.sidebar:
+    U.theme_toggle()
+    U.keep_theme_in_url()
     st.markdown("## ClaimShield Nexus")
     st.caption("Machines find evidence. Humans make decisions. The ledger proves it.")
     U.html_line(U.chip("Public demo · synthetic data · shared state", "blue"))

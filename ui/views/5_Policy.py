@@ -82,7 +82,7 @@ if st.session_state.get("preview_of") == changed and changed:
     with a, U.card("counts"):
         st.subheader("Action counts")
         fig = go.Figure([go.Bar(x=counts.index.str.replace("_", " ").str.title(), y=counts.before, name="Before",
-                                marker_color=U.pal()["accent_soft"]),
+                                marker_color=U.pal()["accent-soft"]),
                          go.Bar(x=counts.index.str.replace("_", " ").str.title(), y=counts.after, name="After",
                                 marker_color=U.ACCENT)])
         fig.update_layout(template=U.plotly_template(), barmode="group", height=280)
