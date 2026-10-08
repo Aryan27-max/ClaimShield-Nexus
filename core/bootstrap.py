@@ -2,9 +2,11 @@
 rebuild them once (generator + pipeline with a fresh ledger; the shipped policy is re-signed by siu.lead).
 An exclusive file lock makes concurrent first visitors wait for one build instead of running it twice."""
 import fcntl
+import subprocess
+import sys
 from pathlib import Path
 
-from core import identity, pipeline, predict
+from core import identity, predict
 from core import schema as S
 from core.snapshots import HORIZONS
 
@@ -27,10 +29,11 @@ def needs_bootstrap() -> bool:
     return bool(missing())
 
 
-def build() -> dict:
-    from data.gen import synth
-    synth.main()
-    return pipeline.run_all(reset_ledger=True)
+def build() -> None:
+    """Generator + pipeline in child processes: their memory (pipeline peak ~0.6 GB) is returned to the OS when they
+    exit instead of staying in the long-running app server."""
+    for args in (["data.gen.synth"], ["core.pipeline", "--reset-ledger"]):
+        subprocess.run([sys.executable, "-m", *args], cwd=S.ROOT, check=True, stdout=subprocess.DEVNULL)
 
 
 def ensure_demo_data(run=build) -> bool:
