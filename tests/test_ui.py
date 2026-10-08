@@ -137,3 +137,43 @@ def test_policy_page_shows_validation_error_not_traceback(tmp_ledger, monkeypatc
     at.run()
     assert not at.exception and any("not a valid policy" in e.value for e in at.error)
     assert at.button(key="preview").disabled
+
+
+@pytest.mark.parametrize("page", ["pages/1_Overview.py", "pages/2_Queue.py", "pages/3_Case.py", "pages/4_Network.py"])
+def test_no_cases_shows_friendly_empty_state(tmp_ledger, tmp_path, monkeypatch, page):
+    import pandas as pd
+    empty = tmp_path / "cases.parquet"
+    pd.read_parquet(S.CASES).head(0).to_parquet(empty, index=False)
+    monkeypatch.setattr(S, "CASES", empty)
+    at = _app(page)
+    assert not at.exception, [e.value for e in at.exception]
+    if page != "pages/4_Network.py":
+        assert any("No cases under this data and policy" in i.value for i in at.info)
+
+
+def test_deleted_policy_version_falls_back_to_available_one(tmp_ledger, tmp_path):
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.session_state["policy_path"] = str(tmp_path / "harness_v7.yaml")
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert at.session_state["policy_path"] == str(S.POLICY)
+    assert any("harness_v7.yaml no longer exists" in w.value for w in at.warning)
+
+
+def test_overview_without_ground_truth(tmp_ledger, monkeypatch):
+    from ui import common
+    monkeypatch.setattr(common, "has_ground_truth", lambda: False)
+    at = _app("pages/1_Overview.py")
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("No ground truth available" in i.value for i in at.info)
+
+
+def test_unexpected_page_error_is_shown_as_friendly_message(tmp_ledger, monkeypatch):
+    from ui import common
+
+    def boom():
+        raise RuntimeError("disk unplugged")
+    monkeypatch.setattr(common, "meta", boom)
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.run()
+    assert any("This page hit an unexpected error: disk unplugged" in e.value for e in at.error)

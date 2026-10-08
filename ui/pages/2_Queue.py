@@ -5,12 +5,13 @@ from ui import common as C
 from ui import style as U
 
 q, m = C.ranked(), C.meta()
+C.require_cases(q)
 f = m.get("funnel", {})
 cap, used = q.attrs.get("capacity_hours", 0), q.attrs.get("used_hours", 0)
 n_over = int((q.status == "over_capacity").sum())
 
-U.page_header("SIU Queue", f"{st.session_state.get('investigators')} investigators · {cap:.0f} h this week · "
-                           f"{q.attrs.get('horizon')}-day horizon · policy {q.policy_hash.iloc[0][:10]}")
+U.page_header("SIU Queue", f"{C.investigators()} investigators · {cap:.0f} h this week · "
+                           f"{q.attrs.get('horizon')}-day horizon · policy {C.policy()['_hash'][:10]}")
 
 tiles = [("Claims flagged", f"{f.get('claims_flagged', 0):,}", "raw rule / lens hits", None),
          ("Alerts", f.get("alerts", 0), "rules · anomaly · graph", None),

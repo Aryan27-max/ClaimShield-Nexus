@@ -8,6 +8,7 @@ from ui import common as C
 from ui import style as U
 
 q = C.ranked()
+C.require_cases(q)
 ids = q.case_id.tolist()
 cur = st.session_state.get("case_id")
 case_id = st.selectbox("Case", ids, index=ids.index(cur) if cur in ids else 0)
@@ -102,9 +103,12 @@ with tab_brief, U.card("brief"):
                "`brief_generated` block with the brief's SHA-256 to the ledger.")
     if st.button("Generate brief", key="gen_brief"):
         actor = f"human:{st.session_state['user_id']}" if st.session_state.get("user_id") else "system:brief"
-        st.session_state[key] = brief.generate({**r.to_dict(), "case_id": case_id}, pol,
-                                               C.claims(C._mtime(C.S.OUT / "claims.parquet")),
-                                               C.table("providers"), C.table("graph_features"), C.meta(), actor=actor)
+        try:
+            st.session_state[key] = brief.generate({**r.to_dict(), "case_id": case_id}, pol,
+                                                   C.claims(C._mtime(C.S.OUT / "claims.parquet")),
+                                                   C.table("providers"), C.table("graph_features"), C.meta(), actor=actor)
+        except (OSError, ValueError, KeyError) as e:
+            C.show_error(e, "Brief could not be generated")
     b = st.session_state.get(key)
     if b:
         a1, a2, a3 = st.columns([1, 1, 2])

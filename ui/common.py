@@ -40,6 +40,14 @@ def policy(path: str | None = None) -> dict:
     return _policy(path, _mtime(Path(path)))
 
 
+def policy_label(path: str) -> str:
+    try:
+        p = policy(path)
+        return f"v{p['version']} · {Path(path).stem} · {p['_hash'][:10]}"
+    except (OSError, ValueError):
+        return f"{Path(path).stem} · invalid"
+
+
 @st.cache_data(show_spinner=False)
 def _cases(path: str, mtime: float, cases_mtime: float) -> pd.DataFrame:
     base = pd.read_parquet(S.CASES).drop(columns=harness.OUTPUT_COLS, errors="ignore")
@@ -58,10 +66,34 @@ def _ranked(path: str, mtime: float, cases_mtime: float, investigators: int, hor
     return q
 
 
+def investigators() -> int:
+    """Sidebar value, else the policy default (pages can render before the sidebar, e.g. in tests)."""
+    return int(st.session_state.get("investigators") or policy()["capacity"]["investigators"])
+
+
+def horizon() -> int:
+    return int(st.session_state.get("horizon") or 90)
+
+
 def ranked() -> pd.DataFrame:
     pol = policy()
-    inv = int(st.session_state.get("investigators", pol["capacity"]["investigators"]))
-    return _ranked(pol["_path"], _mtime(Path(pol["_path"])), _mtime(S.CASES), inv, int(st.session_state.get("horizon") or 90))
+    return _ranked(pol["_path"], _mtime(Path(pol["_path"])), _mtime(S.CASES), investigators(), horizon())
+
+
+def require_cases(q: pd.DataFrame) -> None:
+    """Friendly empty state instead of index errors when the data yields no cases."""
+    if q.empty:
+        st.info("No cases under this data and policy: nothing needs investigator attention right now. "
+                "Re-run the pipeline when new claims arrive.")
+        st.caption(FOOTER)
+        st.stop()
+
+
+def show_error(e: Exception, what: str) -> None:
+    """Plain-language error with the technical details folded away."""
+    st.error(f"{what}: {e}")
+    with st.expander("Technical details"):
+        st.exception(e)
 
 
 @st.cache_data(show_spinner=False)
@@ -129,6 +161,10 @@ def referral_flows() -> pd.DataFrame:
 def _labels(mtime: float) -> pd.DataFrame:
     from eval.metrics import entity_labels
     return entity_labels()
+
+
+def has_ground_truth() -> bool:
+    return all((S.OUT / f"{n}.parquet").exists() for n in ("ground_truth", "legit_outliers"))
 
 
 def labels() -> pd.DataFrame:

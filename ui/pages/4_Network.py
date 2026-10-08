@@ -23,8 +23,13 @@ U.page_header("Network", f"{'Ring of ' + str(len(pids)) + ' providers' if is_rin
 
 g = gf.set_index("provider_id").loc[pids]
 p = prov.set_index("provider_id").loc[pids]
-tiles = [("Community size", int(g.community_size.max()), f"{g.community_id.iloc[0]} (Louvain)"),
-         ("Community density", f"{g.community_density.max():.2f}", "share of possible links"),
+comms = g.groupby("community_id").agg(members=("community_size", "size"), comm_size=("community_size", "first"),
+                                      density=("community_density", "first"))
+one = len(comms) == 1
+tiles = [("Community size", int(comms.comm_size.iloc[0]) if one else f"{len(comms)} communities",
+          ", ".join(comms.index) + " (Louvain)"),
+         ("Community density", f"{comms.density.iloc[0]:.2f}" if one else " / ".join(f"{d:.2f}" for d in comms.density),
+          "share of possible links"),
          ("PPR percentile", f"{g.ppr_pct.max():.0%}", "proximity to confirmed fraud"),
          ("Reciprocal partners", int(g.reciprocal_partners.fillna(0).sum()), f"{int(g.cycles3.fillna(0).sum())} 3-way loops")]
 for col, (label, value, delta) in zip(st.columns(len(tiles)), tiles):

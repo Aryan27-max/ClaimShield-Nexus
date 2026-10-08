@@ -80,7 +80,7 @@ def inject_css() -> None:
 def page_header(title: str, subtitle: str = "") -> None:
     st.title(title)
     if subtitle:
-        st.markdown(f'<div class="cs-sub">{subtitle}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="cs-sub">{html.escape(subtitle)}</div>', unsafe_allow_html=True)
 
 
 def card(key: str):

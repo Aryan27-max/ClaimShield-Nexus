@@ -8,6 +8,7 @@ from ui import common as C
 from ui import style as U
 
 q, m = C.ranked(), C.meta()
+C.require_cases(q)
 f = m.get("funnel", {})
 n_claims = len(C.claims(C._mtime(C.S.OUT / "claims.parquet")))
 n_queued = int((q.status != "not_queued").sum())
@@ -15,7 +16,7 @@ n_slate = int((q.status == "in_capacity").sum())
 reduction = 1 - n_queued / max(f.get("claims_flagged", 1), 1)
 
 U.page_header("Overview", f"Synthetic Medicaid program · data through {m.get('asof', '—')} · "
-                          f"{st.session_state.get('investigators')} investigators · policy {q.policy_hash.iloc[0][:10]}")
+                          f"{C.investigators()} investigators · policy {C.policy()['_hash'][:10]}")
 
 steps = [("Claims", n_claims, "all claim lines"), ("Flagged claims", f.get("claims_flagged", 0), "rule / lens hits"),
          ("Alerts", f.get("alerts", 0), "entity-level"), ("Cases", len(q), "provider or ring"),
@@ -51,30 +52,35 @@ st.write("")
 st.header("Synthetic validation")
 st.caption("Ground truth exists only because the data is synthetic. Only this evaluation reads it; the detection "
            "lenses, fusion and harness never do.")
-lab = C.labels()
-c1, c2 = st.columns([3, 2])
-with c1, U.card("recall"):
-    st.subheader("Recall per planted scheme")
-    rc = M.recall(q, lab)
-    fig = go.Figure([go.Bar(x=rc.scheme, y=rc.any_case, name="Any case", marker_color=U.ACCENT_SOFT),
-                     go.Bar(x=rc.scheme, y=rc.prepay_plus, name="Prepay review or higher", marker_color=U.ACCENT)])
-    fig.update_layout(template=U.plotly_template(), barmode="group", height=320, yaxis=dict(tickformat=".0%"))
-    st.plotly_chart(fig, width="stretch")
-with c2, U.card("legit"):
-    st.subheader("Legitimate outliers")
-    st.caption("High-cost oncology, busy ERs and honest one-off billing slips: none may reach FULL or MFCU.")
-    st.dataframe(M.legit_outcomes(q, lab), width="stretch")
-    v = M.validation(q, lab)
-    U.metric_tile("Clean providers escalated", v["clean_escalated"], "any action needing investigator time",
-                  "green" if v["clean_escalated"] == 0 else "red")
+gt = C.has_ground_truth()
+lab = C.labels() if gt else pd.DataFrame(columns=["entity_id", "label"])
+if not gt:
+    st.info("No ground truth available: recall and false-positive checks need labelled outcomes.")
+else:
+    c1, c2 = st.columns([3, 2])
+    with c1, U.card("recall"):
+        st.subheader("Recall per planted scheme")
+        rc = M.recall(q, lab)
+        fig = go.Figure([go.Bar(x=rc.scheme, y=rc.any_case, name="Any case", marker_color=U.ACCENT_SOFT),
+                         go.Bar(x=rc.scheme, y=rc.prepay_plus, name="Prepay review or higher", marker_color=U.ACCENT)])
+        fig.update_layout(template=U.plotly_template(), barmode="group", height=320, yaxis=dict(tickformat=".0%"))
+        st.plotly_chart(fig, width="stretch")
+    with c2, U.card("legit"):
+        st.subheader("Legitimate outliers")
+        st.caption("High-cost oncology, busy ERs and honest one-off billing slips: none may reach FULL or MFCU.")
+        st.dataframe(M.legit_outcomes(q, lab), width="stretch")
+        v = M.validation(q, lab)
+        U.metric_tile("Clean providers escalated", v["clean_escalated"], "any action needing investigator time",
+                      "green" if v["clean_escalated"] == 0 else "red")
 
 st.write("")
 c3, c4 = st.columns(2)
 with c3, U.card("fairness"):
     st.subheader("Fairness check: flag rate by provider type")
     fr = M.flag_rates(q, "type", lab)
-    fig = go.Figure([go.Bar(x=fr.type, y=fr.flag_rate, name="All providers", marker_color=U.ACCENT),
-                     go.Bar(x=fr.type, y=fr.clean_rate, name="Clean providers (false positives)", marker_color=U.ORANGE)])
+    fig = go.Figure([go.Bar(x=fr.type, y=fr.flag_rate, name="All providers", marker_color=U.ACCENT)] +
+                    ([go.Bar(x=fr.type, y=fr.clean_rate, name="Clean providers (false positives)",
+                             marker_color=U.ORANGE)] if gt else []))
     fig.add_hline(y=fr.attrs["overall"], line_dash="dot", line_color=U.GRAY,
                   annotation_text=f"overall {fr.attrs['overall']:.1%}")
     fig.update_layout(template=U.plotly_template(), barmode="group", height=300, yaxis=dict(tickformat=".0%"))

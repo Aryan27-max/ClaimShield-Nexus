@@ -74,18 +74,21 @@ if st.session_state.get("preview_of") == changed and changed:
         st.dataframe(U.table_style(d, "after"), hide_index=True, width="stretch", height=300)
     st.write("")
     with U.card("validation"):
-        st.subheader("Synthetic validation deltas")
-        st.caption("Ground truth exists only because the data is synthetic.")
-        vb, va = M.validation(cases, C.labels()), M.validation(after, C.labels())
-        rows = [("Upcoding providers at PREPAY+", "upcoding_prepay_plus", True),
-                ("Planted entities at PREPAY+", "planted_prepay_plus", True),
-                ("Clean providers escalated", "clean_escalated", False),
-                ("Legit outliers at FULL / MFCU", "legit_full_or_mfcu", False)]
-        for col, (label, k, up_good) in zip(st.columns(len(rows)), rows):
-            delta = va[k] - vb[k]
-            tone = None if delta == 0 else ("green" if (delta > 0) == up_good else "red")
-            with col:
-                U.metric_tile(label, f"{vb[k]} → {va[k]}", f"{delta:+d}", tone)
+        if not C.has_ground_truth():
+            st.info("No ground truth available: validation deltas need labelled outcomes.")
+        else:
+            st.subheader("Synthetic validation deltas")
+            st.caption("Ground truth exists only because the data is synthetic.")
+            vb, va = M.validation(cases, C.labels()), M.validation(after, C.labels())
+            rows = [("Upcoding providers at PREPAY+", "upcoding_prepay_plus", True),
+                    ("Planted entities at PREPAY+", "planted_prepay_plus", True),
+                    ("Clean providers escalated", "clean_escalated", False),
+                    ("Legit outliers at FULL / MFCU", "legit_full_or_mfcu", False)]
+            for col, (label, k, up_good) in zip(st.columns(len(rows)), rows):
+                delta = va[k] - vb[k]
+                tone = None if delta == 0 else ("green" if (delta > 0) == up_good else "red")
+                with col:
+                    U.metric_tile(label, f"{vb[k]} → {va[k]}", f"{delta:+d}", tone)
 
 st.write("")
 with U.card("save"):

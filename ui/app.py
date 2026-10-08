@@ -25,24 +25,37 @@ with st.sidebar:
     st.caption("Machines find evidence. Humans make decisions. The ledger proves it.")
     st.divider()
     files = C.policy_files()
-    st.session_state.setdefault("policy_path", files[0] if files else str(C.S.POLICY))
     if st.session_state.get("pending_policy") in files:  # set by the Policy page after "Save as new version"
         st.session_state["policy_path"] = st.session_state.pop("pending_policy")
-    pol = C.policy(st.session_state["policy_path"])
-    st.selectbox("Policy version", files, key="policy_path",
-                 format_func=lambda p: f"v{C.policy(p)['version']} · {Path(p).stem} · {C.policy(p)['_hash'][:10]}")
+    gone = st.session_state.get("policy_path")
+    if gone not in files:  # first visit, or the selected version file was removed (e.g. a demo reset)
+        st.session_state["policy_path"] = files[0] if files else str(C.S.POLICY)
+        if gone:
+            st.warning(f"{Path(gone).name} no longer exists; using {Path(st.session_state['policy_path']).name}.")
+    try:
+        pol = C.policy(st.session_state["policy_path"])
+    except (OSError, ValueError) as e:
+        st.error(f"Policy cannot be loaded: {e}")
+        st.stop()
+    st.selectbox("Policy version", files, key="policy_path", format_func=C.policy_label)
     st.segmented_control("Risk horizon (days)", [30, 60, 90], default=90, key="horizon")
     st.caption("Queue uses the calibrated escalation model for this horizon.")
     st.slider("Investigators", 1, 10, value=pol["capacity"]["investigators"], key="investigators")
     st.caption(f"{pol['capacity']['hours_per_investigator_week']} h per investigator per week")
     if st.button("Re-run pipeline", help="Not needed for normal use; sliders only re-rank."):
         from core import pipeline
-        with st.spinner("Running lenses, fusion and harness..."):
-            pipeline.run_all()
-        st.cache_data.clear()
-        st.rerun()
+        try:
+            with st.spinner("Running lenses, fusion and harness..."):
+                pipeline.run_all()
+            st.cache_data.clear()
+            st.rerun()
+        except (OSError, ValueError) as e:
+            st.error(f"Pipeline did not run: {e}")
 
 if not C.S.CASES.exists():
     st.error("No cases yet. Run `python -m data.gen.synth && python -m core.pipeline` first.")
     st.stop()
-nav.run()
+try:
+    nav.run()
+except Exception as e:  # Streamlit's rerun / stop signals derive from BaseException and pass through
+    C.show_error(e, "This page hit an unexpected error")
