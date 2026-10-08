@@ -22,8 +22,8 @@ Full read of `core/`, `ui/`, `eval/`, `data/gen/`, `tests/` and `policy/` (sessi
 | 14 | `ui/pages/1_Overview.py` | The synthetic-validation section crashes when `ground_truth.parquet` is absent (real data). | risk | Shows an information note instead. | fixed |
 | 15 | `ui/style.py` | `page_header` inserts the subtitle into HTML without escaping. | risk | `html.escape`. | fixed |
 | 16 | `ui/app.py`, `ui/pages/3_Case.py`, `ui/pages/5_Policy.py` | Unexpected errors (brief generation, policy write) render as raw tracebacks. | risk | Friendly error box with an expandable details panel. Streamlit control flow (`BaseException`) is untouched. | fixed |
-| 17 | `tests/test_pipeline.py` | The pipeline test overwrites `data/out` and `models/`. `run_meta.ledger_idx` then points into the temporary ledger. | risk | Test runs against a temporary copy of the inputs, outputs and models. | open |
-| 18 | `eval/pipeline_check.py` | Each run re-runs the pipeline and appends 5 blocks to the demo ledger. | risk | Reads existing outputs by default; `--run` re-runs. | open |
+| 17 | `tests/test_pipeline.py` | The pipeline test overwrites `data/out` and `models/`. `run_meta.ledger_idx` then points into the temporary ledger. | risk | Test runs against a temporary copy of the inputs, outputs and models. | fixed |
+| 18 | `eval/pipeline_check.py` | Each run re-runs the pipeline and appends 5 blocks to the demo ledger. | risk | Reads existing outputs by default; `--run` re-runs. | fixed |
 | 19 | `core/harness.py` (`THRESHOLDS`) | The positional path `any_of.1` breaks the Policy page if a policy reorders the PREPAY branches. | risk | The page lists only thresholds that resolve in the selected policy and names the missing ones. | fixed |
 | 20 | `core/brief.py`, `ui/pages/4_Network.py` | Ring network context reports the first member's Louvain community even when members sit in different communities. | cleanup (misleading) | List each distinct community. | fixed |
 | 21 | `core/predict.py` | `split()` raises a bare `IndexError` when history is too short for the embargoed calibration window. | cleanup | Explicit `ValueError` with the reason. | fixed |

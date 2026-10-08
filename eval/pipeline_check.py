@@ -1,5 +1,8 @@
 """P3 exit check: funnel, top queue, action matrix by ground-truth label, policy invariants, runtime.
-Eval may read ground_truth / legit_outliers; the pipeline may not. Run: python -m eval.pipeline_check"""
+Eval may read ground_truth / legit_outliers; the pipeline may not. Reads the last pipeline run (read-only);
+--run re-runs the pipeline first, which appends blocks to the ledger. Run: python -m eval.pipeline_check [--run]"""
+import argparse
+import json
 import sys
 
 import pandas as pd
@@ -37,7 +40,9 @@ def checks(cases: pd.DataFrame, mat: pd.DataFrame, m: pd.DataFrame, policy: dict
 
 
 def main() -> int:
-    meta = pipeline.run_all()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--run", action="store_true", help="re-run the pipeline first (appends to the ledger)")
+    meta = pipeline.run_all() if ap.parse_args().run else json.loads(S.RUN_META.read_text())
     cases, policy = pd.read_parquet(S.CASES), harness.load_policy()
     q = Q.rank(cases, policy)
     f = meta["funnel"]
