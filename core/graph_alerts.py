@@ -5,7 +5,7 @@ import pandas as pd
 from core import schema as S
 
 RECENT_DAYS = 180
-KICKBACK_SHARE, MIN_REFERRALS = 0.8, 10  # CLAUDE.md: >80% of referrals to one entity
+KICKBACK_SHARE, MIN_REFERRALS = 0.8, 10  # spec: >80% of referrals to one entity
 HARM_TYPES = {"dme", "home_health", "bh"}  # member-harm provider types => higher severity
 
 

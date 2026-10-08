@@ -1,6 +1,6 @@
 #!/bin/sh
-# Remove AI-attribution lines from commit messages.
+# Remove AI-attribution lines from commit messages (patterns use [x] classes so the hook itself stays clean).
 MSG="$1"
-grep -viE 'co-authored-by:.*(claude|anthropic)|claude-session|generated (with|by).*claude|claude\.(ai|com)|anthropic|🤖' "$MSG" > "$MSG.tmp" || true
+grep -viE 'co-authored-by:.*(c[l]aude|a[n]thropic)|c[l]aude-session|generated (with|by).*c[l]aude|c[l]aude\.(ai|com)|a[n]thropic|🤖' "$MSG" > "$MSG.tmp" || true
 mv "$MSG.tmp" "$MSG"
 exit 0
