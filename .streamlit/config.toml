@@ -1,9 +1,16 @@
-[theme]
-base = "light"
+# Light and dark themes: the app follows the visitor's system setting (light or dark).
+# Custom CSS follows the active theme live via light-dark() tokens in ui/style.py.
+[theme.light]
 primaryColor = "#0071E3"
 backgroundColor = "#F5F5F7"
 secondaryBackgroundColor = "#FFFFFF"
 textColor = "#1D1D1F"
+
+[theme.dark]
+primaryColor = "#0A84FF"
+backgroundColor = "#000000"
+secondaryBackgroundColor = "#1C1C1E"
+textColor = "#F5F5F7"
 
 [client]
 toolbarMode = "minimal"

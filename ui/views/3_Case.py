@@ -6,6 +6,7 @@ import streamlit as st
 from core import brief, harness, identity, phi
 from core import mandate as M
 from ui import common as C
+from ui import export as E
 from ui import panels as P
 from ui import style as U
 
@@ -94,7 +95,7 @@ with tab_tl, U.card("timeline"):
     c = c.assign(month=c.service_date.dt.to_period("M").dt.to_timestamp(),
                  flagged=c.claim_id.isin(set(r.flagged_claim_ids)))
     tl = c.groupby(["month", "flagged"]).paid_amt.sum().unstack(fill_value=0).reindex(columns=[False, True], fill_value=0)
-    fig = go.Figure([go.Bar(x=tl.index, y=tl[False], name="Paid (not flagged)", marker_color=U.ACCENT_SOFT),
+    fig = go.Figure([go.Bar(x=tl.index, y=tl[False], name="Paid (not flagged)", marker_color=U.pal()["accent_soft"]),
                      go.Bar(x=tl.index, y=tl[True], name="Paid (flagged)", marker_color=U.RED)])
     fig.update_layout(template=U.plotly_template(), barmode="stack", height=360, yaxis_title="Paid $ per month")
     U.plot(fig)
@@ -130,7 +131,7 @@ with tab_brief, U.card("brief"):
     if b:
         a1, a2, a3 = st.columns([1, 1, 2])
         a1.download_button("Download .md", b["markdown"], file_name=f"brief_{case_id}.md", mime="text/markdown")
-        a2.download_button("Download .html (print to PDF)", U.print_html(b["markdown"], f"Brief {case_id}"),
+        a2.download_button("Download .html (print to PDF)", E.print_html(b["markdown"], f"Brief {case_id}"),
                            file_name=f"brief_{case_id}.html", mime="text/html")
         a3.caption(f"Ledger block #{b['ledger_idx']} · sha256 {b['sha256'][:16]} · {b['generated_at']}")
         st.markdown(b["markdown"])

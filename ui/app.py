@@ -13,7 +13,8 @@ from ui import common as C  # noqa: E402
 from ui import style as U  # noqa: E402
 
 st.set_page_config(page_title="ClaimShield Nexus", page_icon=":shield:", layout="wide")
-U.inject_css()
+U.inject_css(C.S.ROOT)
+U.logo(C.S.ROOT)
 
 if B.needs_bootstrap():  # hosted cold start / ephemeral disk: rebuild data, models and keys once
     with st.spinner("Preparing demo data (first load ~20 s)"):

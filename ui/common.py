@@ -130,27 +130,27 @@ def ego_html(entity_id: str, highlight: list[str], max_nodes: int = 150) -> tupl
     from pyvis.network import Network
     G, gf = graph_obj(_mtime(S.OUT / "claims.parquet"))
     sub = graph.ego_graph(entity_id, max_nodes=max_nodes, G=G, graph_features=gf)
-    net = Network(height="520px", width="100%", cdn_resources="in_line", bgcolor=U.CARD, font_color=U.TEXT)
+    net = Network(height="520px", width="100%", cdn_resources="in_line", bgcolor=U.pal()["card"], font_color=U.pal()["text"])
     for n, d in sub.nodes(data=True):
         kind = d.get("kind", "?")
         hot = n in highlight
         net.add_node(n, label=n if kind != "member" else "",
                      title=f"{kind} {phi.token(n) if kind == 'member' else n} {d.get('type', '')}",
                      color=U.NODE_COLORS["highlight"] if hot else U.NODE_COLORS.get(kind, U.GRAY), size=22 if hot else (8 if kind == "member" else 14))
-    hl = set(highlight)
+    hl, edges = set(highlight), U.edge_colors()
     for u, v, d in sub.edges(data=True):
         rel, inner, touches = d.get("rel", ""), u in hl and v in hl, u in hl or v in hl
         if rel == "refers":
-            color, width = (U.EDGE_COLORS["refers"], 3) if inner else (U.EDGE_COLORS["refers_other"], 1)
+            color, width = (edges["refers"], 3) if inner else (edges["refers_other"], 1)
         elif rel in ("owner", "address", "bank") and touches:
-            color, width = U.EDGE_COLORS[rel], 2
+            color, width = edges[rel], 2
         else:
-            color, width = U.EDGE_COLORS["default"], 1
+            color, width = edges["default"], 1
         net.add_edge(u, v, title=rel, color=color, width=width)
     net.set_options(PYVIS_OPTIONS)
     html = net.generate_html().replace("network = new vis.Network(container, data, options);",
                                        "network = new vis.Network(container, data, options);" + FREEZE_JS)
-    return html.replace("</head>", U.PYVIS_HIDE_LOADING + "</head>", 1), sub.number_of_nodes()
+    return html.replace("</head>", U.pyvis_css() + "</head>", 1), sub.number_of_nodes()
 
 
 @st.cache_data(show_spinner=False)

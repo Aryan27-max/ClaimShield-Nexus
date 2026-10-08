@@ -58,6 +58,8 @@ Medicaid program-integrity teams get far more fraud, waste and abuse (FWA) signa
 
 ## Screenshots
 
+Light mode shown. The app follows each visitor's system light/dark setting (black logo in light mode, white logo in dark mode) and switches live if the setting changes.
+
 <table>
   <tr>
     <td width="50%"><img src="docs/img/overview.png" alt="Overview page"><br><sub><b>Overview</b> — 9,061 flagged claims collapse into 63 cases needing investigator time; 7 fit this week.</sub></td>
@@ -362,6 +364,7 @@ claimshield/
 ├── data/gen/      # seeded synthetic generator, planted schemes, legitimate outliers
 ├── eval/          # recall, fairness, model vs baseline, exit checks, results report (only place ground truth is read)
 ├── policy/        # human-authored decision policy versions (harness_v1.yaml)
+├── public/        # logos: Black_logo.png (light mode), White_logo.png (dark mode)
 ├── ui/            # Streamlit app, design system (style.py) and the six views
 ├── tests/         # pytest and Streamlit AppTest suites
 ├── docs/          # RESULTS.md, REVIEW.md, COMPLIANCE.md, screenshots
