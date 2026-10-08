@@ -8,7 +8,6 @@ import time
 import pandas as pd
 
 from core import anomaly, fusion, graph, harness, ledger, predict, rules, snapshots
-from core import queue as Q
 from core import schema as S
 
 TABLES = ["claims", "members", "providers", "addresses", "referrals", "investigations"]
@@ -88,7 +87,7 @@ def run_all(reset_ledger: bool = False, policy_path=None) -> dict:
             "policy_version": policy["version"], "policy_hash": policy["_hash"], "policy_path": policy["_path"],
             "cases_merkle_root": merkle_root(leaves), "n_cases": len(cases),
             "model_params_hash": predict.params_hash(), "model_test": {h: r["test"] for h, r in report.items()},
-            "predictive_available": Q.PREDICTIVE_AVAILABLE, "asof": str(S.END.date())}
+            "model_comparison": [row for r in report.values() for row in r["comparison"]], "asof": str(S.END.date())}
     entry = ledger.append("system:pipeline", "fusion_run", meta)
     timings["total"] = time.time() - t0
     meta.update(ledger_idx=entry["idx"], timings={k: round(v, 2) for k, v in timings.items()})

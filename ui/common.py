@@ -126,16 +126,6 @@ def referral_flows() -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def _model_baseline(mtime: float) -> pd.DataFrame:
-    from eval.metrics import model_vs_baseline
-    return model_vs_baseline()
-
-
-def model_baseline() -> pd.DataFrame:
-    return _model_baseline(_mtime(S.OUT / "snapshots.parquet"))
-
-
-@st.cache_data(show_spinner=False)
 def _labels(mtime: float) -> pd.DataFrame:
     from eval.metrics import entity_labels
     return entity_labels()

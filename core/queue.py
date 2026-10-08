@@ -1,9 +1,6 @@
 """Capacity-aware SIU queue: priority score + greedy fill of investigator hours; overflow is deferred, never dropped."""
 import pandas as pd
 
-PREDICTIVE_AVAILABLE = True
-
-
 def p_fwa(cases: pd.DataFrame, horizon: int = 90) -> pd.Series:
     """Calibrated model P(escalation within horizon); fused confidence only where the provider has no snapshot."""
     col = f"p_{horizon}"
@@ -21,7 +18,10 @@ def _must_take(q: pd.DataFrame, policy: dict) -> pd.Series:
 def rank(cases: pd.DataFrame, policy: dict, investigators: int | None = None,
          hours_per_week: float | None = None, horizon: int = 90) -> pd.DataFrame:
     """Adds p_fwa, severity_w, priority, must_take, rank, cum_hours and status:
-    in_capacity | over_capacity (must-take that doesn't fit: escalate) | deferred | not_queued."""
+    in_capacity | over_capacity (must-take that doesn't fit: escalate) | deferred | not_queued.
+    Greedy fill in rank order (must-take first), skipping cases that don't fit so smaller ones can backfill. With more
+    investigators a backfilled case can lose its slot to a higher-ranked case that now fits; it is then `deferred`,
+    never dropped (strict monotonicity would let small cases block must-take work)."""
     cap = policy["capacity"]
     investigators = cap["investigators"] if investigators is None else investigators
     hours_per_week = cap["hours_per_investigator_week"] if hours_per_week is None else hours_per_week
@@ -49,6 +49,5 @@ def rank(cases: pd.DataFrame, policy: dict, investigators: int | None = None,
     q["rank"] = range(1, len(q) + 1)
     queued_h = float(q.est_hours[q.queued].sum())
     q.attrs.update(capacity_hours=capacity, used_hours=used, queued_hours=queued_h, horizon=horizon,
-                   weeks_to_clear=round(queued_h / capacity, 1) if capacity else float("inf"),
-                   predictive_available=PREDICTIVE_AVAILABLE)
+                   weeks_to_clear=round(queued_h / capacity, 1) if capacity else float("inf"))
     return q

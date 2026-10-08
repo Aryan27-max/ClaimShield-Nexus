@@ -1,4 +1,5 @@
 """Overview: alert-collapse funnel, $ at risk, capacity, synthetic validation, fairness check, model vs baseline."""
+import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -85,17 +86,20 @@ with c3, U.card("fairness"):
                "fairness signal and should stay near zero in every group.")
 with c4, U.card("model"):
     st.subheader("Forecast model vs naive baseline")
-    mb = C.model_baseline()
-    piv = mb.pivot(index="h", columns="scorer", values="roc_auc")
-    npos = mb[mb.scorer == "model new-onset"].set_index("h").n_pos
-    tbl = piv.assign(**{"new-onset positives": npos})[
-        ["model", "baseline", "model new-onset", "baseline new-onset", "new-onset positives"]]
-    st.dataframe(tbl.rename_axis("horizon (days)"), width="stretch")
-    pr = mb.pivot(index="h", columns="scorer", values="pr_auc")
-    st.caption(f"ROC-AUC on the embargoed test split (T ≥ 2025-01). Baseline = strong flag in the last 90 days. "
-               f"PR-AUC model / baseline: " + " · ".join(f"{h} d {pr.loc[h, 'model']:.2f} / {pr.loc[h, 'baseline']:.2f}"
-                                                         for h in pr.index) + ".")
-    st.markdown("**Honest read:** on already-flagged providers the persistence baseline is as good or better. "
-                "The model's value is early warning for providers **without** flag history (new-onset), where the "
-                "baseline is blind (AUC 0.5); those results rest on few positives. A forecast is never evidence.")
+    mb = pd.DataFrame(m.get("model_comparison", []))
+    if mb.empty:
+        st.info("No model metrics yet: run `python -m core.pipeline`.")
+    else:
+        piv = mb.pivot(index="h", columns="scorer", values="roc_auc")
+        npos = mb[mb.scorer == "model new-onset"].set_index("h").n_pos
+        tbl = piv.assign(**{"new-onset positives": npos})[
+            ["model", "baseline", "model new-onset", "baseline new-onset", "new-onset positives"]]
+        st.dataframe(tbl.rename_axis("horizon (days)"), width="stretch")
+        pr = mb.pivot(index="h", columns="scorer", values="pr_auc")
+        st.caption(f"ROC-AUC on the embargoed test split (T ≥ 2025-01). Baseline = strong flag in the last 90 days. "
+                   f"PR-AUC model / baseline: " + " · ".join(f"{h} d {pr.loc[h, 'model']:.2f} / {pr.loc[h, 'baseline']:.2f}"
+                                                             for h in pr.index) + ".")
+        st.markdown("**Honest read:** on already-flagged providers the persistence baseline is as good or better. "
+                    "The model's value is early warning for providers **without** flag history (new-onset), where the "
+                    "baseline is blind (AUC 0.5); those results rest on few positives. A forecast is never evidence.")
 st.caption(C.FOOTER)

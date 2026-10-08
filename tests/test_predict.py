@@ -63,3 +63,20 @@ def test_embargo_train_labels_end_before_next_split():
         assert len(sp["fit"]) and len(sp["cal"]) and len(sp["test"])
         assert sp["fit"]["T"].max() + gap <= sp["cal"]["T"].min()
         assert sp["cal"]["T"].max() + gap <= sp["test"]["T"].min()
+
+
+def test_split_needs_enough_history_for_embargo():
+    snap = pd.read_parquet(S.OUT / "snapshots.parquet")
+    with pytest.raises(ValueError, match="not enough snapshot history"):
+        P.split(snap[snap["T"] <= "2024-08-31"], 90)
+
+
+def test_pipeline_comparison_matches_a_fresh_retrain():
+    import json
+    from eval.metrics import model_vs_baseline
+    meta = json.loads(S.RUN_META.read_text())
+    stored = pd.DataFrame(meta["model_comparison"]).set_index(["h", "scorer"]).sort_index()
+    fresh = model_vs_baseline().set_index(["h", "scorer"]).sort_index()
+    pd.testing.assert_frame_equal(stored, fresh, check_dtype=False)
+    base = stored.xs("baseline new-onset", level="scorer")
+    assert (base.roc_auc == 0.5).all()

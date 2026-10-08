@@ -55,8 +55,11 @@ def split(snap: pd.DataFrame, h: int) -> dict:
     ends = lab["T"] + pd.Timedelta(days=h)
     pre = lab[ends <= TEST_START]
     cal_ts = sorted(pre["T"].unique())[-CAL_MONTHS:]
-    return {"fit": pre[ends[pre.index] <= cal_ts[0]], "cal": pre[pre["T"].isin(cal_ts)],
-            "test": lab[lab["T"] >= TEST_START]}
+    fit = pre[ends[pre.index] <= cal_ts[0]] if len(cal_ts) == CAL_MONTHS else pre.iloc[:0]
+    if fit.empty or not (lab["T"] >= TEST_START).any():
+        raise ValueError(f"h={h}: not enough snapshot history around {TEST_START.date()} for an embargoed "
+                         f"fit / {CAL_MONTHS}-month calibration / test split")
+    return {"fit": fit, "cal": pre[pre["T"].isin(cal_ts)], "test": lab[lab["T"] >= TEST_START]}
 
 
 def precision_at_k(df: pd.DataFrame, score: str, label: str, k: int = 20) -> float:
@@ -73,6 +76,17 @@ def metrics(df: pd.DataFrame, score: str, label: str) -> dict:
             "p_at_20": round(precision_at_k(df, score, label), 3)}
 
 
+def compare(model: lgb.LGBMClassifier, iso: IsotonicRegression, test: pd.DataFrame, h: int) -> list[dict]:
+    """Model vs a naive persistence baseline (strong flag in the last 90 d) on all test rows and on new-onset rows
+    (no strong flag before T, where the baseline is blind). New-onset uses raw scores: isotonic plateaus tie."""
+    raw = model.predict_proba(test[FEATURES])[:, 1]
+    t = test.assign(p=iso.predict(raw), raw=raw, bl=test.bl_strong_90d)
+    new, y = t[t.bl_strong_ever == 0], f"label_{h}"
+    return [{"h": h, "scorer": name, "n_pos": int(df[y].sum()), **metrics(df, sc, y)}
+            for name, sc, df in [("model", "p", t), ("baseline", "bl", t), ("model new-onset", "raw", new),
+                                 ("baseline new-onset", "bl", new)]]
+
+
 def train(snap: pd.DataFrame, h: int) -> tuple[lgb.LGBMClassifier, IsotonicRegression, dict]:
     sp = split(snap, h)
     y = f"label_{h}"
@@ -81,7 +95,8 @@ def train(snap: pd.DataFrame, h: int) -> tuple[lgb.LGBMClassifier, IsotonicRegre
         model.predict_proba(sp["cal"][FEATURES])[:, 1], sp["cal"][y])
     test = sp["test"].assign(p=iso.predict(model.predict_proba(sp["test"][FEATURES])[:, 1]))
     ranges = {k: [str(v["T"].min().date()), str(v["T"].max().date())] for k, v in sp.items()}
-    return model, iso, {"ranges": ranges, "test": metrics(test, "p", y), "n_pos_fit": int(sp["fit"][y].sum())}
+    return model, iso, {"ranges": ranges, "test": metrics(test, "p", y), "n_pos_fit": int(sp["fit"][y].sum()),
+                        "comparison": compare(model, iso, sp["test"], h)}
 
 
 def drivers(model: lgb.LGBMClassifier, X: pd.DataFrame, k: int = 3) -> list[list[dict]]:

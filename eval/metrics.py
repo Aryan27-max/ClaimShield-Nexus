@@ -79,17 +79,7 @@ def flag_rates(cases: pd.DataFrame, by: str, labels: pd.DataFrame | None = None)
 
 
 def model_vs_baseline(snap: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Per horizon, on the embargoed test split: model vs naive persistence baseline (strong flag in last 90 d),
-    on all rows and on new-onset rows (no strong flag ever before T)."""
+    """Retrains each horizon and returns predict.compare rows (embargoed test split): model vs naive persistence
+    baseline, on all rows and on new-onset rows. Same seed => same numbers as the pipeline's run_meta."""
     snap = pd.read_parquet(S.OUT / "snapshots.parquet") if snap is None else snap
-    rows = []
-    for h in HORIZONS:
-        model, iso, _ = P.train(snap, h)
-        test = P.split(snap, h)["test"]
-        raw = model.predict_proba(test[P.FEATURES])[:, 1]
-        test = test.assign(p=iso.predict(raw), raw=raw, bl=test.bl_strong_90d)
-        new = test[test.bl_strong_ever == 0]
-        for name, sc, df in [("model", "p", test), ("baseline", "bl", test), ("model new-onset", "raw", new),
-                             ("baseline new-onset", "bl", new)]:
-            rows.append({"h": h, "scorer": name, "n_pos": int(df[f"label_{h}"].sum()), **P.metrics(df, sc, f"label_{h}")})
-    return pd.DataFrame(rows)
+    return pd.DataFrame([row for h in HORIZONS for row in P.train(snap, h)[2]["comparison"]])
