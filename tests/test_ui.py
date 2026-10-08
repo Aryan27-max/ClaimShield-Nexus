@@ -183,3 +183,70 @@ def test_unexpected_page_error_is_shown_as_friendly_message(tmp_ledger, monkeypa
     at = AppTest.from_file(APP, default_timeout=60)
     at.run()
     assert any("This page hit an unexpected error: disk unplugged" in e.value for e in at.error)
+
+
+def test_full_dual_control_flow_obligations_and_tamper(tmp_ledger):
+    from core import compliance as CO
+    from core import mandate as M
+    at = _app("views/3_Case.py")
+    assert at.title[0].value == "Case RING-P0007"
+    at.selectbox(key="reason_code").set_value("EVIDENCE_CORROBORATED")
+    next(b for b in at.button if b.label == "Sign & submit").click().run()
+    assert harness.decisions(tmp_ledger).status.iloc[-1] == "PENDING_APPROVAL"
+    assert not [b for b in at.button if b.label == "Approve (second signature)"]
+    at.session_state["identity"] = "siu.lead"
+    at.run()
+    at.button(key="approve").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert harness.decisions(tmp_ledger).status.iloc[-1] == "EXECUTED"
+    assert set(CO.obligations(tmp_ledger).type) == {"SUSPENSION_DETERMINATION", "MFCU_REFERRAL", "MFCU_CERTIFICATION"}
+    assert any("Written MFCU referral" in m.value for m in at.markdown)
+    at.switch_page("views/6_Ledger.py").run()
+    at.button(key="verify").click().run()
+    assert any("Chain intact" in m.value for m in at.markdown)
+    at.button(key="verify_sigs").click().run()
+    assert any("signed mandates verified" in m.value for m in at.markdown)
+    idx = int(M.verify_signatures(tmp_ledger).query("event_type == 'decision_mandate'").idx.iloc[0])
+    at.number_input[0].set_value(idx)
+    next(b for b in at.button if b.label == "Simulate tamper").click().run()
+    at.button(key="verify").click().run()
+    assert any(f"broken at block {idx}" in m.value for m in at.markdown)
+    at.button(key="verify_sigs").click().run()
+    assert any(f"Signature invalid at block {idx}" in m.value for m in at.markdown)
+
+
+def test_case_viewed_logged_once_per_case_per_session(tmp_ledger):
+    at = _app("views/3_Case.py")
+    at.run()
+    at.run()
+    assert ledger.read(tmp_ledger).event_type.tolist().count("case_viewed") == 1
+    at.selectbox[0].set_value(at.selectbox[0].options[1]).run()
+    assert ledger.read(tmp_ledger).event_type.tolist().count("case_viewed") == 2
+
+
+def test_tables_masked_and_reveal_is_audited(tmp_ledger):
+    import pandas as pd
+    from core import phi
+    cases = pd.read_parquet(S.CASES)
+    dup = cases[cases.codes.map(lambda c: "R01" in list(c))].case_id.iloc[0]
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.session_state["case_id"] = dup
+    at.run()
+    at.switch_page("views/3_Case.py").run()
+    frames = [d.value for d in at.dataframe]
+    ev = next(f for f in frames if "expected" in f.columns)
+    assert not ev.value.astype(str).str.contains(phi.MEMBER_RE).any()
+    mem = next(f for f in frames if "age_band" in f.columns)
+    assert "member_id" not in mem.columns and mem.member.str.startswith("MBR-").all()
+    at.text_input(key="reveal_reason").input("verify services with members")
+    next(b for b in at.button if b.label == "Reveal member details").click().run()
+    assert "phi_access" in ledger.read(tmp_ledger).event_type.tolist()
+    assert any("member_id" in d.value.columns for d in at.dataframe)
+
+
+def test_auditor_cannot_reveal(tmp_ledger):
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.session_state["identity"] = "auditor"
+    at.run()
+    at.switch_page("views/3_Case.py").run()
+    assert next(b for b in at.button if b.label == "Reveal member details").disabled
