@@ -173,3 +173,44 @@ Append-only SQLite table: `idx, ts, actor, event_type, payload_json, payload_sha
 | Silent policy change | Policy versions hashed into ledger |
 | Data gaps | Completeness check lowers confidence, adds to limitations |
 | Model drift | Time-split eval; precision tracked from investigator verdicts |
+
+## 10. Signed mandates (AP2-inspired)
+Agent-payment mandates (signed intent, signed cart, default-deny automation, tamper-evident logs) applied to enforcement: the policy is the **intent mandate** signed by an SIU lead, each decision is a **decision mandate** signed by the investigator and bound to the case, evidence and policy hashes, and high-impact actions need an **execution mandate**, a second signature by a different SIU lead. Mandates are canonical JSON (sorted keys, no whitespace) → SHA-256 → Ed25519 signature; each is stored with its signature and key fingerprint in a ledger block. Production would hold keys in an HSM/KMS behind SSO identities.
+
+```mermaid
+sequenceDiagram
+  actor Lead as SIU lead
+  actor Inv as Investigator
+  participant H as Harness
+  participant M as Mandates
+  participant C as Compliance
+  participant L as Ledger
+  Lead->>M: Sign policy mandate with version, hash and scope
+  M->>L: policy_mandate block
+  Inv->>H: Sign decision mandate bound to case, evidence and policy hashes
+  H->>M: Verify signature, hashes, role and allowed action
+  alt action needs dual control
+    H->>L: decision_mandate block with status PENDING_APPROVAL
+    Lead->>M: Sign execution mandate as a second person
+    M->>L: execution_mandate block with status EXECUTED
+  else single control
+    H->>L: decision_mandate block with status EXECUTED
+  end
+  H->>C: Create obligations from the executed decision only
+  C->>L: compliance_event blocks
+```
+
+Fail safe: a missing, invalid or revoked policy mandate makes `decide()` refuse every action; the system actor may only route MONITOR / NEEDS_MORE_DATA; an approver must be an SIU lead other than the decision signer; a revoked decision cannot be approved.
+
+## 11. Compliance obligations
+Obligations are created only from executed human decisions (never from scores): REFER_TO_MFCU creates a payment-suspension determination (SUSPEND or GOOD_CAUSE with documented reason), a written MFCU referral due the next business day (weekends skipped; federal holidays out of scope) and an MFCU certification every 90 days while open; an OVERPAYMENT_IDENTIFIED decision starts a 60-day return clock, pausable up to 180 days only for programs the policy allows (Medicare A/B). Status is computed against an injectable `asof` date. Citations: docs/COMPLIANCE.md.
+
+```mermaid
+stateDiagram-v2
+  [*] --> OPEN: executed human decision creates the obligation
+  OPEN --> MET: human records completion with a note
+  OPEN --> OVERDUE: as-of date passes the due date
+  OVERDUE --> MET: completed late and still recorded
+  OPEN --> OPEN: good-faith pause extends the due date for allowed programs
+  MET --> [*]
+```
