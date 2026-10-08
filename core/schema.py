@@ -25,8 +25,8 @@ SCHEMES = [
 ]
 OUTCOMES = ["confirmed", "unfounded", "education"]
 LENSES = ["rules", "anomaly", "graph", "predict"]
-GENERATED = ["members", "providers", "facilities", "addresses", "owners", "referrals", "claims", "investigations",
-             "ground_truth", "legit_outliers"]
+PIPELINE_TABLES = ["alerts_rules", "alerts_anomaly", "alerts_graph", "graph_features", "snapshots", "predictions",
+                   "cases"]
 ALERT_COLUMNS = [
     "alert_id", "lens", "entity_type", "entity_id", "claim_ids", "code",
     "severity", "score", "dollars_at_risk", "evidence",
@@ -106,6 +106,6 @@ def load(name: str) -> pd.DataFrame:
     """Read a generated table from data/out; a missing file names the command that creates it."""
     path = OUT / f"{name}.parquet"
     if not path.exists():
-        step = "python -m data.gen.synth" if name in GENERATED else "python -m core.pipeline"
+        step = "python -m core.pipeline" if name in PIPELINE_TABLES else "python -m data.gen.synth"
         raise FileNotFoundError(f"{path.name} not found in {OUT}: run `{step}` first.")
     return pd.read_parquet(path)
