@@ -23,3 +23,15 @@ def test_generator_respects_hardware_caps(tables):
     assert len(tables["claims"]) <= S.MAX_CLAIMS
     assert tables["claims"].service_date.between(S.START, S.END).all()
     assert set(tables["ground_truth"].scheme) == set(S.SCHEMES)
+
+
+def test_missing_data_gives_actionable_error(tmp_path, monkeypatch):
+    import pytest
+
+    from core import pipeline
+    from core import schema as S
+    monkeypatch.setattr(S, "OUT", tmp_path)
+    with pytest.raises(FileNotFoundError, match="python -m data.gen.synth"):
+        pipeline.run_all()
+    with pytest.raises(FileNotFoundError, match="python -m core.pipeline"):
+        S.load("graph_features")

@@ -17,7 +17,7 @@ Full read of `core/`, `ui/`, `eval/`, `data/gen/`, `tests/` and `policy/` (sessi
 | 9 | `core/ledger.py` | Two sessions appending at the same time race for the next `idx`, so the second fails with `IntegrityError`. | risk | `BEGIN IMMEDIATE` serialises writers. | open |
 | 10 | `core/ledger.py` | Connections opened with `with sqlite3.connect()` are committed but never closed. | risk | Close every connection explicitly. | open |
 | 11 | `core/brief.py` | The header cites the next ledger index, which is computed before the append. A concurrent append makes the citation wrong. | risk | Build the brief inside the ledger write transaction (payload callable receives the index). | open |
-| 12 | `core/schema.py` | `load()` on a missing `data/out` raises a bare `FileNotFoundError` with no guidance. | risk | Message names the command to run (`python -m data.gen.synth`). | open |
+| 12 | `core/schema.py` | `load()` on a missing `data/out` raises a bare `FileNotFoundError` with no guidance. | risk | Message names the command to run (`python -m data.gen.synth`). | fixed |
 | 13 | `ui/pages/1_Overview.py` | A cold load trains three models for the baseline card (2–4 s, against the < 3 s target). | risk | `core/predict` computes baseline and new-onset metrics during the pipeline run and stores them in `run_meta` and the `model_run` ledger block. Overview reads them. | open |
 | 14 | `ui/pages/1_Overview.py` | The synthetic-validation section crashes when `ground_truth.parquet` is absent (real data). | risk | Shows an information note instead. | open |
 | 15 | `ui/style.py` | `page_header` inserts the subtitle into HTML without escaping. | risk | `html.escape`. | open |
@@ -27,7 +27,7 @@ Full read of `core/`, `ui/`, `eval/`, `data/gen/`, `tests/` and `policy/` (sessi
 | 19 | `core/harness.py` (`THRESHOLDS`) | The positional path `any_of.1` breaks the Policy page if a policy reorders the PREPAY branches. | risk | The page lists only thresholds that resolve in the selected policy and names the missing ones. | open |
 | 20 | `core/brief.py`, `ui/pages/4_Network.py` | Ring network context reports the first member's Louvain community even when members sit in different communities. | cleanup (misleading) | List each distinct community. | open |
 | 21 | `core/predict.py` | `split()` raises a bare `IndexError` when history is too short for the embargoed calibration window. | cleanup | Explicit `ValueError` with the reason. | open |
-| 22 | `data/gen/schemes.py` | 268 lines (limit 250). | cleanup | Legit outliers and honest errors move to `data/gen/outliers.py`. Same RNG call order, so the data is byte-identical (verified by parquet hashes). | open |
+| 22 | `data/gen/schemes.py` | 268 lines (limit 250). | cleanup | Legit outliers and honest errors move to `data/gen/outliers.py`. Same RNG call order, so the data is byte-identical (verified by parquet hashes). | fixed |
 | 23 | `core/harness.py` | 246 lines; validation would push it past 250. | cleanup | Policy editing and versioning move to `core/policy_edit.py`. | open |
 | 24 | `core/fusion.py` | `load_alerts()` is never called. | cleanup | Removed. | open |
 | 25 | `core/queue.py`, `core/pipeline.py` | The `PREDICTIVE_AVAILABLE` flag is a P3 leftover that is always `True`. | cleanup | Removed. | open |

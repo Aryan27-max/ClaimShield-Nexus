@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from core import schema as S
-from data.gen import schemes
+from data.gen import legit, schemes
 
 def _mix(em_share: float, extra: dict) -> dict:
     return {**{k: v * em_share for k, v in zip(S.EM_LEVELS, S.EM_BASE_MIX)}, **extra}
@@ -211,12 +211,12 @@ def generate(seed: int = S.SEED) -> dict:
     claims = base_claims(rng, members, providers, ctx)
     ctx["free"] = set(providers.provider_id)
     ctx["vol"] = claims.provider_id.value_counts()
-    outliers = schemes.legit_outliers(claims, providers, rng, ctx)
+    outliers = legit.outliers(claims, providers, rng, ctx)
     claims = pd.concat([claims, outliers.pop("claims")], ignore_index=True)
     gt = []
     for inject in schemes.INJECTORS:
         claims = inject(claims, providers, members, gt, rng, ctx)
-    honest = schemes.honest_error(claims, providers, rng, ctx)
+    honest = legit.honest_error(claims, providers, rng, ctx)
     claims = honest["claims"]
     claims = finalize(schemes.drop_post_death(claims, members, gt), providers, ctx)
     assert len(claims) <= S.MAX_CLAIMS, len(claims)
