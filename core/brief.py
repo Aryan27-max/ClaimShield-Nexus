@@ -4,7 +4,7 @@ import hashlib
 
 import pandas as pd
 
-from core import ledger
+from core import ledger, phi
 
 MAX_ROWS = 8
 CLASS_ORDER = ["deterministic", "structural", "statistical"]
@@ -74,7 +74,8 @@ def evidence(case) -> list[str]:
         if not len(sub):
             out += ["No evidence in this class.", ""]
             continue
-        rows = [[r.claim_id or "—", r.field, r.value, r.expected, r.code] for r in sub.head(MAX_ROWS).itertuples()]
+        rows = [[r.claim_id or "—", r.field, phi.mask_text(r.value), phi.mask_text(r.expected), r.code]
+                for r in sub.head(MAX_ROWS).itertuples()]
         out += _table(rows, ["claim_id", "field", "value", "expected", "code"])
         if len(sub) > MAX_ROWS:
             out.append(f"\n{len(sub) - MAX_ROWS} more in case file.")

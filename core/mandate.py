@@ -166,7 +166,7 @@ def check_decision(block: dict | None, case, policy: dict, action: str, reason_c
 
 def approve(decision_id: int, approver: str, policy: dict, db=None, asof=None) -> dict:
     """Execution mandate: a second SIU lead (not the decision signer) signs; only then the decision is EXECUTED."""
-    from core import harness
+    from core import compliance, harness
     d = harness.decisions(db)
     row = d[d.decision_id == decision_id]
     if row.empty or row.status.iloc[0] != "PENDING_APPROVAL":
@@ -188,7 +188,9 @@ def approve(decision_id: int, approver: str, policy: dict, db=None, asof=None) -
     with closing(harness._db(db)) as con, con:
         con.execute("UPDATE decisions SET status='EXECUTED', execution_mandate_hash=? WHERE decision_id=?",
                     (block["mandate_hash"], int(decision_id)))
-    return {"ledger_idx": idx, "mandate_hash": block["mandate_hash"], "status": "EXECUTED"}
+    rec = row.iloc[0].to_dict() | {"decision_id": int(decision_id)}
+    obs = compliance.on_executed(rec, policy, block["mandate_hash"], asof=asof, db=db)
+    return {"ledger_idx": idx, "mandate_hash": block["mandate_hash"], "status": "EXECUTED", "obligations": obs}
 
 
 def revoke(target_hash: str, reason: str, signer: str, db=None) -> dict:

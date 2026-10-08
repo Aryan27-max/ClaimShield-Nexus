@@ -80,6 +80,25 @@ capacity:
   hours_per_investigator_week: 30
   no_capacity_actions: [MONITOR, NEEDS_MORE_DATA]
 
+# Compliance pack. Citations are for orientation, not legal advice; state rules vary.
+program: medicaid                    # medicaid | medicare_ab | medicare_advantage | part_d
+allow_pause_programs: [medicare_ab]  # programs where the 180-day good-faith overpayment investigation pause applies
+record_retention_years: 10           # display only
+regulatory_basis:
+  actions:
+    REFER_TO_MFCU: "42 CFR 455.23 (payment suspension on credible allegation of fraud; written MFCU referral no later than the next business day); 42 CFR 438.608(a)(8) (managed care plan suspends payments when the State directs)"
+    FULL_INVESTIGATION: "42 CFR 455.14-455.16 (preliminary investigation, full investigation, resolution)"
+    PREPAY_REVIEW: "State Medicaid prepayment review authority (state-specific: verify)"
+    PROVIDER_EDUCATION: "Provider education for non-fraud billing errors (state / CMS program integrity practice: verify)"
+  rules:
+    R07: "42 CFR 455.436 (check OIG LEIE / SAM); 42 CFR 1001.1901 (effect of exclusion)"
+    R02: "Medicaid NCCI methodologies (procedure-to-procedure edits) under ACA section 6507"
+    R03: "Medicaid NCCI methodologies (medically unlikely edits) under ACA section 6507"
+  overpayment: "42 U.S.C. 1320a-7k(d) (report and return within 60 days of identification)"
+  overpayment_pause: "42 CFR 401.305 (Medicare A/B: up to 180-day good-faith investigation before the 60 days run); 42 CFR 422.326 (MA) and 423.360 (Part D): no 180-day pause"
+  hipaa: "45 CFR 164.502(b) minimum necessary; 45 CFR 164.312(b) audit controls; 45 CFR 164.312(c)(1) integrity"
+  retention: "42 CFR 438.3(u) / 42 CFR 422.504(d) (10-year record retention)"
+
 reason_codes:
   EVIDENCE_CORROBORATED: Evidence reviewed and corroborated across sources
   PATTERN_CONSISTENT_FWA: Billing pattern consistent with fraud, waste or abuse
@@ -88,4 +107,5 @@ reason_codes:
   INSUFFICIENT_EVIDENCE: Evidence insufficient; gather more data
   HIGH_MEMBER_HARM: Potential harm to vulnerable members warrants priority
   ALREADY_UNDER_REVIEW: Provider already under review or open case
+  OVERPAYMENT_IDENTIFIED: Overpayment identified (enter the amount; starts the 60-day return clock)
   OTHER: Other (explain in note)

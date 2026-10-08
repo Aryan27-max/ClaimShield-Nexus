@@ -70,3 +70,10 @@ def validate_policy(pol: dict) -> dict:
     if errs:
         raise ValueError("invalid policy: " + "; ".join(errs))
     return pol
+
+
+def regulatory_basis(policy: dict, action: str | None = None, codes=()) -> list[tuple[str, str]]:
+    """[(topic, citation)] from the policy's `regulatory_basis` for an action and the case's rule codes."""
+    rb = policy.get("regulatory_basis", {})
+    out = [(action, rb.get("actions", {})[action])] if action in rb.get("actions", {}) else []
+    return out + [(c, rb.get("rules", {})[c]) for c in sorted(set(codes)) if c in rb.get("rules", {})]

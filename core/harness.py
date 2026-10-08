@@ -10,10 +10,10 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from core import ledger
+from core import compliance, ledger
 from core import mandate as M
 from core import schema as S
-from core.policy_schema import ACTIONS, EVIDENCE_CLASSES, SAFE, validate_policy  # noqa: F401
+from core.policy_schema import ACTIONS, EVIDENCE_CLASSES, SAFE, regulatory_basis, validate_policy  # noqa: F401
 
 ESCALATING = ACTIONS[:1:-1]  # MFCU -> EDUCATION, checked top-down
 OUTPUT_COLS = ["allowed_actions", "recommended_action", "rule_trace", "requires_human", "missing_classes",
@@ -125,6 +125,7 @@ def evaluate(case, policy: dict) -> dict:
     rec = allowed[0] if allowed else ("NEEDS_MORE_DATA" if stat_only else "MONITOR")
     if not allowed:
         trace.append(f"no escalating action passed → {rec}")
+    trace += [f"regulatory basis ({topic}): {cite}" for topic, cite in regulatory_basis(policy, rec, case["codes"])]
     return {"allowed_actions": allowed + SAFE, "recommended_action": rec, "rule_trace": trace,
             "requires_human": any(policy["actions"][a].get("requires_human", False) for a in allowed),
             "missing_classes": missing, "predictive_driven": bool(lift and rec == "PREPAY_REVIEW")}
@@ -191,8 +192,12 @@ def decide(case_id: str, action: str, user_id: str, reason_code: str, note: str 
                           (datetime.now(timezone.utc).isoformat(), case_id, action, ev["recommended_action"], user_id,
                            reason_code, note, policy["version"], policy["_hash"], entry["idx"], status,
                            mandate["mandate_hash"], amount))
-    return {"decision_id": cur.lastrowid, "ledger_idx": entry["idx"], "hash": entry["hash"], "status": status,
-            "mandate_hash": mandate["mandate_hash"]}
+    out = {"decision_id": cur.lastrowid, "ledger_idx": entry["idx"], "hash": entry["hash"], "status": status,
+           "mandate_hash": mandate["mandate_hash"]}
+    if status == "EXECUTED":  # obligations come only from executed human decisions
+        out["obligations"] = compliance.on_executed({**payload, "decision_id": cur.lastrowid}, policy,
+                                                    mandate["mandate_hash"], asof=asof, db=db)
+    return out
 
 
 def decisions(db=None) -> pd.DataFrame:
