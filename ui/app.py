@@ -6,6 +6,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st  # noqa: E402
 
+from core import identity  # noqa: E402
+from core import mandate as M  # noqa: E402
 from ui import common as C  # noqa: E402
 from ui import style as U  # noqa: E402
 
@@ -23,6 +25,11 @@ nav = st.navigation(PAGES)
 with st.sidebar:
     st.markdown("## ClaimShield Nexus")
     st.caption("Machines find evidence. Humans make decisions. The ledger proves it.")
+    st.divider()
+    st.session_state.setdefault("identity", "inv.a")
+    st.selectbox("Signed in as", identity.people(), key="identity",
+                 format_func=lambda u: f"{u} · {identity.ROLE_LABELS[identity.role(u)]}")
+    st.caption("Demo identities · Ed25519 keys in data/out/keys (production: SSO + HSM/KMS keys)")
     st.divider()
     files = C.policy_files()
     if st.session_state.get("pending_policy") in files:  # set by the Policy page after "Save as new version"
@@ -52,6 +59,11 @@ with st.sidebar:
         except (OSError, ValueError) as e:
             st.error(f"Pipeline did not run: {e}")
 
+authorised, why, _ = M.policy_status(pol)
+if not authorised:
+    U.result_card(False, f"Policy not authorised: {why}. Every decision is blocked until an SIU lead signs this "
+                         "version.")
+    st.write("")
 if not C.S.CASES.exists():
     st.error("No cases yet. Run `python -m data.gen.synth && python -m core.pipeline` first.")
     st.stop()

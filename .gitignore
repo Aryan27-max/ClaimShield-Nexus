@@ -22,3 +22,6 @@ __pycache__/
 
 # internal notes
 SUMMARY.md
+
+# signing keys (demo identities)
+*.pem

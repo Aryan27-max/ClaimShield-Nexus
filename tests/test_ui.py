@@ -12,9 +12,13 @@ pytestmark = pytest.mark.skipif(not S.CASES.exists(), reason="run python -m core
 
 @pytest.fixture
 def tmp_ledger(tmp_path, monkeypatch):
+    """Temporary ledger + demo keys; the shipped policy is signed by siu.lead (block 0)."""
+    from core import identity, mandate
     db = tmp_path / "l.db"
     monkeypatch.setattr(ledger, "LEDGER_DB", db)
     monkeypatch.setattr(S, "LEDGER_DB", db)
+    monkeypatch.setattr(identity, "KEYS_DIR", tmp_path / "keys")
+    mandate.issue_policy(harness.load_policy(), "siu.lead", db=db)
     return db
 
 
@@ -42,21 +46,23 @@ def test_slider_reranks_without_error(tmp_ledger):
 
 def test_decision_submit_writes_decision_and_ledger(tmp_ledger):
     at = _app("views/3_Case.py")
-    at.text_input(key="user_id").input("tester")
     at.selectbox(key="reason_code").set_value("EVIDENCE_CORROBORATED")
-    next(b for b in at.button if b.label == "Record decision").click()
+    next(b for b in at.button if b.label == "Sign & submit").click()
     at.run()
     assert not at.exception and at.success, [e.value for e in at.error]
-    assert len(harness.decisions(tmp_ledger)) == 1
-    lg = ledger.read(tmp_ledger)
-    assert len(lg) == 1 and lg.event_type[0] == "human_decision"
+    d = harness.decisions(tmp_ledger)
+    assert len(d) == 1 and d.user_id[0] == "inv.a" and d.status[0] == "PENDING_APPROVAL"
+    events = list(ledger.read(tmp_ledger).event_type)
+    assert events[0] == "policy_mandate" and events[-2:] == ["decision_mandate", "human_decision"]
 
 
-def test_decision_without_user_is_rejected(tmp_ledger):
-    at = _app("views/3_Case.py")
-    next(b for b in at.button if b.label == "Record decision").click()
+def test_auditor_cannot_sign_decisions(tmp_ledger):
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.session_state["identity"] = "auditor"
     at.run()
-    assert at.error and len(ledger.read(tmp_ledger)) == 0
+    at.switch_page("views/3_Case.py").run()
+    assert next(b for b in at.button if b.label == "Sign & submit").disabled
+    assert any("read-only" in i.value for i in at.info)
 
 
 def test_ledger_verify_detects_tamper(tmp_ledger):
@@ -74,7 +80,7 @@ def test_case_brief_generates_and_logs(tmp_ledger):
     at.button(key="gen_brief").click().run()
     assert not at.exception, [e.value for e in at.exception]
     lg = ledger.read(tmp_ledger)
-    assert len(lg) == 1 and lg.event_type[0] == "brief_generated"
+    assert list(lg.event_type) == ["policy_mandate", "brief_generated"]
     assert any("Decision notice" in m.value for m in at.markdown)
 
 
@@ -90,7 +96,7 @@ def test_policy_preview_shows_changes(tmp_ledger):
     tiles = [m.value for m in at.markdown if "cs-tile" in m.value]
     assert any("Upcoding providers at PREPAY+" in t and ">1 → 5<" in t for t in tiles)
     assert any("Clean providers escalated" in t and ">0 → 0<" in t for t in tiles)
-    assert len(ledger.read(tmp_ledger)) == 0
+    assert len(ledger.read(tmp_ledger)) == 1  # only the signed policy; the preview writes nothing
 
 
 def test_queue_open_case_renders_case_page(tmp_ledger):

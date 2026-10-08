@@ -7,7 +7,8 @@ import time
 
 import pandas as pd
 
-from core import anomaly, fusion, graph, harness, ledger, predict, rules, snapshots
+from core import anomaly, fusion, graph, harness, identity, ledger, predict, rules, snapshots
+from core import mandate as M
 from core import schema as S
 
 TABLES = ["claims", "members", "providers", "addresses", "referrals", "investigations"]
@@ -47,6 +48,10 @@ def run_all(reset_ledger: bool = False, policy_path=None) -> dict:
         ledger.reset()
     t0 = time.time()
     t = {n: S.load(n) for n in TABLES}
+    policy = harness.load_policy(policy_path)
+    identity.ensure()
+    if not (M.mandates().ref == policy["_hash"]).any():  # demo: the shipped policy is signed by the SIU lead once
+        M.issue_policy(policy, "siu.lead")
     timings = {"load": time.time() - t0}
 
     t1 = time.time()
@@ -76,7 +81,6 @@ def run_all(reset_ledger: bool = False, policy_path=None) -> dict:
     predict.log_run(report, timings["predict"])
 
     t1 = time.time()
-    policy = harness.load_policy(policy_path)
     cases = harness.evaluate_all(fusion.build_cases(alerts, t, gf, policy, preds), policy)
     cases.to_parquet(S.CASES, index=False)
     timings["fusion_harness"] = time.time() - t1

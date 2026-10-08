@@ -33,24 +33,28 @@ def test_preview_does_not_touch_the_policy(base):
     assert PE.get_threshold(pol, "abstain.statistical_min") == harness.load_policy()["abstain"]["statistical_min"]
 
 
-def test_save_writes_new_version_and_ledger_block(base, tmp_path):
+def test_save_writes_new_version_and_ledger_block(base, tmp_path, signed):
     _, pol = base
-    folder, db = tmp_path / "policy", tmp_path / "l.db"
+    folder, db = tmp_path / "policy", tmp_path / "save.db"
     folder.mkdir()
     shutil.copy(S.POLICY, folder / "harness_v1.yaml")
     old_bytes = (folder / "harness_v1.yaml").read_bytes()
-    out = PE.save_version(PE.with_thresholds(pol, DEMO_THRESHOLDS), "lead", "demo", old=pol, folder=folder, db=db)
+    with pytest.raises(ValueError, match="only an SIU lead"):
+        PE.save_version(PE.with_thresholds(pol, DEMO_THRESHOLDS), "inv.a", "demo", old=pol, folder=folder, db=db)
+    out = PE.save_version(PE.with_thresholds(pol, DEMO_THRESHOLDS), "siu.lead", "demo", old=pol, folder=folder, db=db)
     assert out["path"].endswith("harness_v2.yaml") and (folder / "harness_v1.yaml").read_bytes() == old_bytes
     saved = harness.load_policy(out["path"])
     assert saved["version"] == 2 and saved["parent_hash"] == pol["_hash"] and saved["abstain"]["statistical_min"] == 0.4
     lg = ledger.read(db)
-    assert len(lg) == 1 and lg.event_type[0] == "policy_change" and pol["_hash"] in lg.payload_json[0]
+    assert list(lg.event_type) == ["policy_change", "policy_mandate"] and pol["_hash"] in lg.payload_json[0]
     assert out["hash"] in lg.payload_json[0]
+    from core import mandate
+    assert mandate.policy_status(saved, db)[0] and not mandate.policy_status(pol, db)[0]
     with pytest.raises(ValueError, match="nothing to save"):
-        PE.save_version(saved, "lead", "again", old=saved, folder=folder, db=db)
-    out3 = PE.save_version(PE.with_thresholds(saved, {"abstain.statistical_min": 0.45}), "lead", "again", old=saved,
-                           folder=folder, db=db)
-    assert out3["path"].endswith("harness_v3.yaml") and len(ledger.read(db)) == 2
+        PE.save_version(saved, "siu.lead", "again", old=saved, folder=folder, db=db)
+    out3 = PE.save_version(PE.with_thresholds(saved, {"abstain.statistical_min": 0.45}), "siu.lead", "again",
+                           old=saved, folder=folder, db=db)
+    assert out3["path"].endswith("harness_v3.yaml") and len(ledger.read(db)) == 4
     assert sorted(p.name for p in folder.iterdir()) == ["harness_v1.yaml", "harness_v2.yaml", "harness_v3.yaml"]
 
 
@@ -111,10 +115,10 @@ def test_hash_changes_iff_content_changes(base, tmp_path):
     assert harness.load_policy(copy_)["_hash"] != pol["_hash"]
 
 
-def test_save_into_folder_without_versions_continues_numbering(base, tmp_path):
+def test_save_into_folder_without_versions_continues_numbering(base, tmp_path, signed):
     _, pol = base
-    out = PE.save_version(PE.with_thresholds(pol, DEMO_THRESHOLDS), "lead", "demo", old=pol, folder=tmp_path,
-                          db=tmp_path / "l.db")
+    out = PE.save_version(PE.with_thresholds(pol, DEMO_THRESHOLDS), "siu.lead", "demo", old=pol, folder=tmp_path,
+                          db=tmp_path / "l2.db")
     assert out["version"] == pol["version"] + 1 and (tmp_path / f"harness_v{out['version']}.yaml").exists()
 
 

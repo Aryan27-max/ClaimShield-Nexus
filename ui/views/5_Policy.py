@@ -95,11 +95,12 @@ with U.card("save"):
     st.subheader("Save as new version")
     st.caption("Writes policy/harness_vN.yaml (older versions are never overwritten) and appends a policy_change "
                "block (old hash → new hash, author, reason) to the ledger. The queue re-ranks under the new version.")
+    author, is_lead = C.me(), C.my_role() == "siu_lead"
+    st.caption(f"Signing as {author}: " + ("the new version is signed with your key (policy mandate)." if is_lead else
+                                          "only an SIU lead can sign a new policy version."))
     with st.form("save_policy", border=False):
-        x, y = st.columns([1, 2])
-        author = x.text_input("Author", key="policy_author")
-        reason = y.text_input("Change reason", key="policy_reason")
-        save = st.form_submit_button("Save as new version", disabled=not changed)
+        reason = st.text_input("Change reason", key="policy_reason")
+        save = st.form_submit_button("Sign & save as new version", disabled=not (changed and is_lead))
     if save:
         try:
             out = PE.save_version(new, author, reason, old=pol)

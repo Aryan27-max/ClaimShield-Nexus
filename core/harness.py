@@ -1,5 +1,6 @@
 """Decision harness: human-authored policy YAML -> allowed / recommended actions with a rule trace.
-decide() is the only writer of final actions (human user_id + reason_code, ledgered)."""
+decide() is the only writer of final actions: it needs an authorised (signed) policy and a signed decision mandate
+bound to the live case; dual-control actions stay PENDING_APPROVAL until a second SIU lead signs (core.mandate)."""
 import hashlib
 import sqlite3
 from contextlib import closing
@@ -10,18 +11,19 @@ import pandas as pd
 import yaml
 
 from core import ledger
+from core import mandate as M
 from core import schema as S
+from core.policy_schema import ACTIONS, EVIDENCE_CLASSES, SAFE, validate_policy  # noqa: F401
 
-ACTIONS = ["MONITOR", "NEEDS_MORE_DATA", "PROVIDER_EDUCATION", "PREPAY_REVIEW", "FULL_INVESTIGATION", "REFER_TO_MFCU"]
 ESCALATING = ACTIONS[:1:-1]  # MFCU -> EDUCATION, checked top-down
-SAFE = ["NEEDS_MORE_DATA", "MONITOR"]
-EVIDENCE_CLASSES = ["deterministic", "structural", "statistical"]
 OUTPUT_COLS = ["allowed_actions", "recommended_action", "rule_trace", "requires_human", "missing_classes",
                "predictive_driven", "est_hours", "policy_version", "policy_hash"]  # added by evaluate_all
 DECISIONS_DDL = """CREATE TABLE IF NOT EXISTS decisions (
     decision_id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, case_id TEXT NOT NULL, action TEXT NOT NULL,
     recommended_action TEXT, user_id TEXT NOT NULL, reason_code TEXT NOT NULL, note TEXT,
-    policy_version INTEGER, policy_hash TEXT, ledger_idx INTEGER)"""
+    policy_version INTEGER, policy_hash TEXT, ledger_idx INTEGER, status TEXT, decision_mandate_hash TEXT,
+    execution_mandate_hash TEXT, amount REAL)"""
+STATUS_COLS = {"status": "TEXT", "decision_mandate_hash": "TEXT", "execution_mandate_hash": "TEXT", "amount": "REAL"}
 
 
 def load_policy(path: Path | str | None = None) -> dict:
@@ -30,70 +32,6 @@ def load_policy(path: Path | str | None = None) -> dict:
     raw = p.read_bytes()
     pol = validate_policy(yaml.safe_load(raw) or {})
     pol["_hash"], pol["_path"] = hashlib.sha256(raw).hexdigest(), str(p)
-    return pol
-
-
-REQUIRED = ["version", "class_map", "class_weights", "completeness", "abstain", "actions", "severity_weights",
-            "member_harm", "est_hours", "capacity", "reason_codes"]
-CONDITIONS = {"min_classes", "min_conf", "min_dollars", "max_dollars", "min_severity", "max_severity", "classes_any",
-              "classes_all", "codes_any", "min_class_score", "predictive_lift", "any_of", "requires_human"}
-
-
-def _num(v) -> bool:
-    return isinstance(v, (int, float)) and not isinstance(v, bool)
-
-
-def validate_policy(pol: dict) -> dict:
-    """Raises ValueError listing every problem: missing keys, probabilities outside [0, 1], negative $ or hours."""
-    errs = [f"missing key '{k}'" for k in REQUIRED if k not in pol]
-    if errs:
-        raise ValueError("invalid policy: " + "; ".join(errs))
-
-    def check(path: str, v, lo: float, hi: float, integer: bool = False) -> None:
-        if not _num(v) or not lo <= v <= hi or (integer and v != int(v)):
-            errs.append(f"{path} = {v!r} must be {'an integer' if integer else 'a number'} in [{lo:g}, {hi:g}]")
-
-    def cond(path: str, c: dict) -> None:
-        for k, v in (c or {}).items():
-            p = f"{path}.{k}"
-            if k not in CONDITIONS:
-                errs.append(f"{p}: unknown condition")
-            elif k == "any_of":
-                for i, sub in enumerate(v):
-                    cond(f"{p}.{i}", sub)
-            elif k == "min_conf":
-                check(p, v, 0, 1)
-            elif k == "min_class_score":
-                for c_, x in v.items():
-                    check(f"{p}.{c_}", x, 0, 1)
-            elif k in ("min_dollars", "max_dollars"):
-                check(p, v, 0, float("inf"))
-            elif k in ("min_severity", "max_severity"):
-                check(p, v, 1, 5, integer=True)
-            elif k == "min_classes":
-                check(p, v, 1, len(EVIDENCE_CLASSES), integer=True)
-
-    for c, w in pol["class_weights"].items():
-        check(f"class_weights.{c}", w, 0, 1)
-    for k in ("statistical_min", "min_completeness"):
-        check(f"abstain.{k}", pol["abstain"].get(k), 0, 1)
-    for k in ("lift_min", "statistical_min") if "predictive" in pol else ():
-        check(f"predictive.{k}", pol["predictive"].get(k), 0, 1)
-    for a in ACTIONS:
-        if a not in pol["actions"]:
-            errs.append(f"actions.{a} missing")
-        check(f"est_hours.{a}", pol["est_hours"].get(a), 0, 168)
-    check("est_hours.per_extra_provider", pol["est_hours"].get("per_extra_provider"), 0, 168)
-    for a, c in pol["actions"].items():
-        cond(f"actions.{a}", c)
-    check("capacity.investigators", pol["capacity"].get("investigators"), 1, 1000, integer=True)
-    check("capacity.hours_per_investigator_week", pol["capacity"].get("hours_per_investigator_week"), 1, 168)
-    bad = set(pol.get("must_take", {}).get("actions", [])) - set(ACTIONS)
-    errs += [f"must_take.actions: unknown action {a}" for a in sorted(bad)]
-    if not pol["reason_codes"]:
-        errs.append("reason_codes must not be empty")
-    if errs:
-        raise ValueError("invalid policy: " + "; ".join(errs))
     return pol
 
 
@@ -203,14 +141,20 @@ def evaluate_all(cases: pd.DataFrame, policy: dict) -> pd.DataFrame:
 
 
 def _db(db) -> sqlite3.Connection:
-    con = sqlite3.connect(Path(db or S.LEDGER_DB))
+    con = sqlite3.connect(Path(db or ledger.LEDGER_DB))
     con.execute(DECISIONS_DDL)
+    have = {r[1] for r in con.execute("PRAGMA table_info(decisions)")}
+    for col, typ in STATUS_COLS.items():  # ledgers created before signed mandates
+        if col not in have:
+            con.execute(f"ALTER TABLE decisions ADD COLUMN {col} {typ}")
     return con
 
 
 def decide(case_id: str, action: str, user_id: str, reason_code: str, note: str = "",
-           cases: pd.DataFrame | None = None, policy: dict | None = None, db=None) -> dict:
-    """The ONLY writer of final actions. Re-checks the case against the policy; raises ValueError if invalid."""
+           cases: pd.DataFrame | None = None, policy: dict | None = None, db=None, mandate: dict | None = None,
+           amount: float | None = None, asof=None) -> dict:
+    """The ONLY writer of final actions. Re-checks the case against the policy, requires the policy to be authorised
+    and a signed decision mandate that matches the live case; raises ValueError otherwise."""
     policy = policy or load_policy()
     cases = cases if cases is not None else pd.read_parquet(S.CASES)
     row = cases[cases.case_id == case_id]
@@ -222,20 +166,33 @@ def decide(case_id: str, action: str, user_id: str, reason_code: str, note: str 
         raise ValueError(f"reason_code must be one of {list(policy['reason_codes'])}")
     if reason_code == "OTHER" and not str(note or "").strip():
         raise ValueError("note is required when reason_code is OTHER")
+    if reason_code == "OVERPAYMENT_IDENTIFIED" and not (amount or 0) > 0:
+        raise ValueError("an overpayment amount > 0 is required for OVERPAYMENT_IDENTIFIED")
+    ok, why, _ = M.policy_status(policy, db)
+    if not ok:
+        raise ValueError(f"Policy not authorised: {why}")
     ev = evaluate(row.iloc[0], policy)
     if action not in ev["allowed_actions"]:
         raise ValueError(f"{action} is not allowed for {case_id}; allowed: {ev['allowed_actions']}")
+    M.check_decision(mandate, row.iloc[0], policy, action, reason_code, note, user_id, amount)
+    status = "PENDING_APPROVAL" if action in policy.get("dual_control_actions", []) else "EXECUTED"
+    M.store(mandate, db)
+    actor = "system:automation" if user_id == "system" else f"human:{user_id}"
     payload = {"case_id": case_id, "action": action, "recommended_action": ev["recommended_action"],
                "allowed_actions": ev["allowed_actions"], "user_id": user_id, "reason_code": reason_code,
-               "note": note, "confidence": float(row.iloc[0].confidence),
-               "policy_version": policy["version"], "policy_hash": policy["_hash"]}
-    entry = ledger.append(f"human:{user_id}", "human_decision", payload, db)
+               "note": note, "amount": amount, "confidence": float(row.iloc[0].confidence), "status": status,
+               "decision_mandate_hash": mandate["mandate_hash"], "policy_version": policy["version"],
+               "policy_hash": policy["_hash"]}
+    entry = ledger.append(actor, "human_decision", payload, db)
     with closing(_db(db)) as con, con:
         cur = con.execute("INSERT INTO decisions (ts, case_id, action, recommended_action, user_id, reason_code, note, "
-                          "policy_version, policy_hash, ledger_idx) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                          "policy_version, policy_hash, ledger_idx, status, decision_mandate_hash, amount) "
+                          "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                           (datetime.now(timezone.utc).isoformat(), case_id, action, ev["recommended_action"], user_id,
-                           reason_code, note, policy["version"], policy["_hash"], entry["idx"]))
-    return {"decision_id": cur.lastrowid, "ledger_idx": entry["idx"], "hash": entry["hash"]}
+                           reason_code, note, policy["version"], policy["_hash"], entry["idx"], status,
+                           mandate["mandate_hash"], amount))
+    return {"decision_id": cur.lastrowid, "ledger_idx": entry["idx"], "hash": entry["hash"], "status": status,
+            "mandate_hash": mandate["mandate_hash"]}
 
 
 def decisions(db=None) -> pd.DataFrame:

@@ -71,6 +71,10 @@ must_take:                 # filled first; if it doesn't fit => over capacity, e
   actions: [REFER_TO_MFCU]
   min_severity: 5          # any queued case at this severity is also must-take
 
+# Signed mandates: high-impact actions need a second, different SIU lead's signature; automation is default-deny.
+dual_control_actions: [REFER_TO_MFCU]
+automation_scope: [MONITOR, NEEDS_MORE_DATA]
+
 capacity:
   investigators: 3
   hours_per_investigator_week: 30

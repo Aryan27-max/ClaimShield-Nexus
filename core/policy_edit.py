@@ -9,7 +9,8 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from core import harness, ledger
+from core import harness, identity, ledger
+from core import mandate as M
 from core import schema as S
 
 THRESHOLDS = {  # dotted policy path -> label shown on the Policy page
@@ -87,9 +88,12 @@ def _versions(folder: Path) -> list[int]:
 
 
 def save_version(policy: dict, author: str, reason: str, old: dict, folder: Path | str | None = None, db=None) -> dict:
-    """Writes policy/harness_vN.yaml (N = next free version; never overwrites) and a `policy_change` ledger block."""
+    """Writes policy/harness_vN.yaml (N = next free version; never overwrites), a `policy_change` ledger block and the
+    new version's policy mandate signed by `author`, who must be an SIU lead."""
     if not str(author).strip() or not str(reason).strip():
         raise ValueError("author and change reason are required")
+    if identity.role(author) != "siu_lead":
+        raise ValueError(f"only an SIU lead can sign a new policy version ({author} is {identity.role(author)})")
     if content(policy) == content(old):
         raise ValueError("no threshold changed: nothing to save")
     harness.validate_policy(content(policy) | {"version": 1})
@@ -106,4 +110,6 @@ def save_version(policy: dict, author: str, reason: str, old: dict, folder: Path
     entry = ledger.append(f"human:{author}", "policy_change", {
         "old_version": old["version"], "old_hash": old["_hash"], "new_version": n, "new_hash": new["_hash"],
         "path": path.name, "author": author, "reason": reason}, db)
-    return {"path": str(path), "hash": new["_hash"], "version": n, "ledger_idx": entry["idx"]}
+    signed = M.issue_policy(new, author, parent_hash=old["_hash"], db=db)
+    return {"path": str(path), "hash": new["_hash"], "version": n, "ledger_idx": entry["idx"],
+            "mandate_hash": signed["mandate_hash"]}

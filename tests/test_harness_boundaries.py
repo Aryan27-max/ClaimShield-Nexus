@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from core import harness
+from core import mandate as M
 from core import schema as S
 
 POL = harness.load_policy()
@@ -17,7 +18,8 @@ def case(classes=("deterministic",), conf=0.9, fused=None, completeness=1.0, usd
     s.update(scores)
     return {"case_id": "X", "classes": list(classes), "codes": list(codes), "confidence": conf,
             "fused_score": conf if fused is None else fused, "completeness": completeness,
-            "dollars_at_risk": usd, "max_severity": sev, **s}
+            "dollars_at_risk": usd, "max_severity": sev, "providers": ["X"], "flagged_claim_ids": [], "alert_ids": [],
+            "evidence": [], **s}
 
 
 def ev(c: dict) -> dict:
@@ -100,13 +102,15 @@ def test_recommended_is_highest_allowed_and_safe_actions_always_allowed():
         assert out["recommended_action"] == out["allowed_actions"][0] or out["recommended_action"] in harness.SAFE
 
 
-def test_decide_rejects_other_without_note_and_unknown_case(tmp_path):
+def test_decide_rejects_other_without_note_and_unknown_case(signed):
+    db = signed["db"]
     cases = harness.evaluate_all(pd.DataFrame([{**case(sev=5), "n_providers": 1, "member_harm_w": 1.0,
                                                "limitations": []}]), POL)
     with pytest.raises(ValueError, match="note is required"):
-        harness.decide("X", "FULL_INVESTIGATION", "alice", "OTHER", "", cases=cases, policy=POL, db=tmp_path / "l.db")
+        harness.decide("X", "FULL_INVESTIGATION", "inv.a", "OTHER", "", cases=cases, policy=POL, db=db)
     with pytest.raises(ValueError, match="unknown case"):
-        harness.decide("NOPE", "MONITOR", "alice", "EVIDENCE_CORROBORATED", cases=cases, policy=POL, db=tmp_path / "l.db")
-    out = harness.decide("X", "NEEDS_MORE_DATA", "alice", "INSUFFICIENT_EVIDENCE", cases=cases, policy=POL,
-                         db=tmp_path / "l.db")
-    assert out["ledger_idx"] == 0
+        harness.decide("NOPE", "MONITOR", "inv.a", "EVIDENCE_CORROBORATED", cases=cases, policy=POL, db=db)
+    m = M.sign_decision(cases.iloc[0], POL, "NEEDS_MORE_DATA", "INSUFFICIENT_EVIDENCE", "", "inv.a")
+    out = harness.decide("X", "NEEDS_MORE_DATA", "inv.a", "INSUFFICIENT_EVIDENCE", cases=cases, policy=POL, db=db,
+                         mandate=m)
+    assert out["status"] == "EXECUTED" and out["ledger_idx"] == 2

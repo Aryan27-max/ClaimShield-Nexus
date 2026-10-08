@@ -3,7 +3,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from core import brief, harness
+from core import brief, harness, identity
+from core import mandate as M
 from ui import common as C
 from ui import style as U
 
@@ -125,23 +126,35 @@ with tab_brief, U.card("brief"):
 st.write("")
 with U.card("decision"):
     st.subheader("Human decision")
+    who, role = C.me(), C.my_role()
+    can_sign = role in ("investigator", "siu_lead")
+    st.caption(f"Signing as {who} ({identity.ROLE_LABELS.get(role, role)}) · the Ed25519 decision mandate binds the "
+               "case, evidence and policy hashes")
     with st.form("decision", clear_on_submit=False, border=False):
         a, b = st.columns(2)
-        user_id = a.text_input("Investigator user_id", key="user_id")
-        action = b.selectbox("Action (allowed by policy)", list(r.allowed_actions), key="action")
+        action = a.selectbox("Action (allowed by policy)", list(r.allowed_actions), key="action")
         reasons = pol["reason_codes"]
-        reason = a.selectbox("Reason code", list(reasons), format_func=lambda k: f"{k} — {reasons[k]}", key="reason_code")
-        note = b.text_area("Note", key="note", height=68)
-        submitted = st.form_submit_button("Record decision")
+        reason = b.selectbox("Reason code", list(reasons), format_func=lambda k: f"{k} — {reasons[k]}", key="reason_code")
+        note = a.text_area("Note", key="note", height=68)
+        amount = b.number_input("Overpayment amount $ (OVERPAYMENT_IDENTIFIED only)", min_value=0.0, value=0.0,
+                                step=100.0, key="amount")
+        submitted = st.form_submit_button("Sign & submit", disabled=not can_sign)
+    if not can_sign:
+        st.info("Auditors have read-only access and cannot sign decisions.")
     if submitted:
+        amt = float(amount) if reason == "OVERPAYMENT_IDENTIFIED" else None
         try:
-            out = harness.decide(case_id, action, user_id, reason, note, cases=q, policy=pol)
-            st.success(f"Decision recorded: {action} on {case_id} → ledger block #{out['ledger_idx']} ({out['hash'][:12]})")
+            block = M.sign_decision({**r.to_dict(), "case_id": case_id}, pol, action, reason, note, who, amt)
+            out = harness.decide(case_id, action, who, reason, note, cases=q, policy=pol, mandate=block, amount=amt)
+            state = ("pending approval: a different SIU lead must add the second signature"
+                     if out["status"] == "PENDING_APPROVAL" else "executed")
+            st.success(f"Signed {action} on {case_id} ({state}) → ledger block #{out['ledger_idx']} · mandate "
+                       f"{out['mandate_hash'][:12]}")
         except ValueError as e:
             st.error(str(e))
     prev = harness.decisions()
     prev = prev[prev.case_id == case_id]
     if len(prev):
-        st.dataframe(prev[["ts", "user_id", "action", "recommended_action", "reason_code", "note", "ledger_idx"]],
+        st.dataframe(prev[["ts", "user_id", "action", "status", "reason_code", "note", "ledger_idx"]],
                      hide_index=True, width="stretch")
 st.caption(C.FOOTER)

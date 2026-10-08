@@ -39,7 +39,7 @@ def test_run_all_under_60s_and_logs_to_ledger(sandbox):
     assert sandbox["elapsed"] < 60
     cases = sandbox["cases"]
     assert len(cases) == sandbox["meta"]["n_cases"] and cases.case_id.is_unique
-    assert list(sandbox["ledger"].event_type) == ["lens_run"] * 3 + ["model_run", "fusion_run"]
+    assert list(sandbox["ledger"].event_type) == ["policy_mandate"] + ["lens_run"] * 3 + ["model_run", "fusion_run"]
     assert ledger.verify(sandbox["db"]) == (True, None)
 
 

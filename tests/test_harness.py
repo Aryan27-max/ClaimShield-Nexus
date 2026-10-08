@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from core import harness, ledger
+from core import mandate as M
 from core import queue as Q
 
 POLICY = harness.load_policy()
@@ -12,7 +13,8 @@ def _case(case_id="P9999", classes=("deterministic",), conf=0.9, usd=10_000.0, s
     scores.update({f"score_{c}": conf for c in classes})
     return {"case_id": case_id, "classes": list(classes), "codes": list(codes), "confidence": conf,
             "fused_score": conf, "completeness": 1.0, "dollars_at_risk": usd, "max_severity": sev,
-            "n_providers": 1, "member_harm_w": 1.0, "limitations": [], **scores, **kw}
+            "n_providers": 1, "member_harm_w": 1.0, "limitations": [], "providers": [case_id], "flagged_claim_ids": [],
+            "alert_ids": [], "evidence": [], **scores, **kw}
 
 
 def _cases(*rows) -> pd.DataFrame:
@@ -48,25 +50,28 @@ def test_mfcu_needs_two_classes():
     assert two["recommended_action"] == "REFER_TO_MFCU" and two["requires_human"]
 
 
-def test_decide_rejects_invalid(tmp_path):
-    db = tmp_path / "l.db"
-    cases = _cases(_case())
+def test_decide_rejects_invalid(signed):
+    db, cases = signed["db"], _cases(_case())
+    case = cases.iloc[0]
     with pytest.raises(ValueError, match="not allowed"):
-        harness.decide("P9999", "REFER_TO_MFCU", "alice", "EVIDENCE_CORROBORATED", cases=cases, db=db)
+        harness.decide("P9999", "REFER_TO_MFCU", "inv.a", "EVIDENCE_CORROBORATED", cases=cases, db=db,
+                       mandate=M.sign_decision(case, POLICY, "REFER_TO_MFCU", "EVIDENCE_CORROBORATED", "", "inv.a"))
     with pytest.raises(ValueError, match="reason_code"):
-        harness.decide("P9999", "FULL_INVESTIGATION", "alice", "", cases=cases, db=db)
+        harness.decide("P9999", "FULL_INVESTIGATION", "inv.a", "", cases=cases, db=db)
     with pytest.raises(ValueError, match="user_id"):
         harness.decide("P9999", "FULL_INVESTIGATION", " ", "EVIDENCE_CORROBORATED", cases=cases, db=db)
-    assert len(ledger.read(db)) == 0 and len(harness.decisions(db)) == 0
+    assert len(ledger.read(db)) == 1 and len(harness.decisions(db)) == 0
 
 
-def test_decide_writes_decision_and_ledger(tmp_path):
-    db = tmp_path / "l.db"
-    out = harness.decide("P9999", "FULL_INVESTIGATION", "alice", "EVIDENCE_CORROBORATED", "ok",
-                         cases=_cases(_case()), db=db)
+def test_decide_writes_decision_and_ledger(signed):
+    db, cases = signed["db"], _cases(_case())
+    m = M.sign_decision(cases.iloc[0], POLICY, "FULL_INVESTIGATION", "EVIDENCE_CORROBORATED", "ok", "inv.a")
+    out = harness.decide("P9999", "FULL_INVESTIGATION", "inv.a", "EVIDENCE_CORROBORATED", "ok", cases=cases, db=db,
+                         mandate=m)
     d, lg = harness.decisions(db), ledger.read(db)
-    assert len(d) == 1 and len(lg) == 1 and int(d.ledger_idx[0]) == out["ledger_idx"]
-    assert lg.event_type[0] == "human_decision" and ledger.verify(db) == (True, None)
+    assert len(d) == 1 and int(d.ledger_idx[0]) == out["ledger_idx"] and d.status[0] == "EXECUTED"
+    assert list(lg.event_type) == ["policy_mandate", "decision_mandate", "human_decision"]
+    assert ledger.verify(db) == (True, None)
 
 
 def test_queue_respects_capacity():

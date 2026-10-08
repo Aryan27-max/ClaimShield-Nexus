@@ -11,7 +11,7 @@ import networkx as nx  # noqa: E402
 import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
 
-from core import graph, harness  # noqa: E402
+from core import graph, harness, identity  # noqa: E402
 from core import queue as Q  # noqa: E402
 from core import schema as S  # noqa: E402
 from ui import style as U  # noqa: E402
@@ -64,6 +64,15 @@ def cases() -> pd.DataFrame:
 def _ranked(path: str, mtime: float, cases_mtime: float, investigators: int, horizon: int) -> pd.DataFrame:
     q = Q.rank(_cases(path, mtime, cases_mtime), harness.load_policy(path), investigators=investigators, horizon=horizon)
     return q
+
+
+def me() -> str:
+    """Signed-in demo identity from the sidebar (an investigator by default)."""
+    return str(st.session_state.get("identity") or "inv.a")
+
+
+def my_role() -> str | None:
+    return identity.role(me())
 
 
 def investigators() -> int:
