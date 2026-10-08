@@ -3,14 +3,13 @@ import pytest
 
 from core import ledger, rules
 from core import schema as S
-from data.gen import synth
 
 EVIDENCE_KEYS = {"claim_id", "field", "value", "expected", "source"}
 
 
 @pytest.fixture(scope="module")
-def data():
-    t = synth.generate()
+def data(tables):
+    t = tables
     alerts = rules.run_rules(t["claims"], t["members"], t["providers"], t["addresses"])
     return t, alerts
 
