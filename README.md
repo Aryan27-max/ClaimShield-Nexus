@@ -16,7 +16,8 @@
 ![PyVis](https://img.shields.io/badge/PyVis-0.3-6A5ACD)
 ![SQLite](https://img.shields.io/badge/SQLite-hash%20chain-003B57?logo=sqlite&logoColor=white)
 ![PyYAML](https://img.shields.io/badge/PyYAML-6.0-CB171E)
-![pytest](https://img.shields.io/badge/pytest-152%20tests-0A9EDC?logo=pytest&logoColor=white)
+![cryptography](https://img.shields.io/badge/cryptography-Ed25519-4B8BBE)
+![pytest](https://img.shields.io/badge/pytest-186%20tests-0A9EDC?logo=pytest&logoColor=white)
 
 | Layer | Technology |
 |---|---|
@@ -26,6 +27,7 @@
 | Graph | NetworkX entity graph, Louvain communities, personalized PageRank; PyVis ego networks |
 | Decision harness | Human-authored YAML policy (PyYAML), versioned and hashed |
 | Audit ledger | SQLite, append-only SHA-256 hash chain (Python standard library) |
+| Signed mandates | Ed25519 signatures (`cryptography`) on policy, decision and approval mandates |
 | UI | Streamlit multipage app, Plotly charts |
 | Testing | pytest, Streamlit AppTest, fresh-clone end-to-end check |
 
@@ -39,8 +41,8 @@ Medicaid program-integrity teams get far more fraud, waste and abuse (FWA) signa
 - **Evidence-class fusion.** Alerts collapse into provider or ring cases. Independence is counted by evidence class (deterministic, structural, statistical), not by alert count, and the forecast never counts as evidence.
 - **Human-authored policy harness.** A versioned YAML policy decides which actions are allowed. Weak or thin evidence abstains to `NEEDS_MORE_DATA`, and `REFER_TO_MFCU` needs two evidence classes, minimum dollars and confidence, plus a human.
 - **Capacity-aware SIU queue.** `priority = P(escalation) × $ at risk × severity × member harm ÷ est. hours`, filled against real investigator hours. Must-take cases go first, and overflow is shown, never dropped.
-- **Explainable investigation briefs.** A deterministic 12-section brief (evidence table, timeline, network, forecast drivers, limitations, why not a higher action) downloads as Markdown or print-ready HTML.
-- **Tamper-evident ledger.** Lens runs, model runs, policy versions, briefs and human decisions are hash-chained. Verify points to the exact broken block.
+- **Explainable investigation briefs.** A deterministic 14-section brief (evidence table, timeline, network, forecast drivers, limitations, regulatory basis, authorisation chain) downloads as Markdown or print-ready HTML.
+- **Signed, tamper-evident decisions.** Policies, decisions and approvals are Ed25519-signed mandates; high-impact actions need a second signature; everything is hash-chained, and tampering fails both chain and signature checks at the same block.
 
 ## Screenshots
 
@@ -215,6 +217,50 @@ erDiagram
 | Graph | Shared owner/address/bank, referral loops and concentration, member overlap, Louvain communities, personalized PageRank seeded from confirmed cases | Structural | DME rings, kickback referrals |
 | Predictive | LightGBM per horizon on provider × month snapshots, isotonic calibration, SHAP drivers, embargoed time split | Forecast, never evidence | Early warning for providers without flag history |
 
+## Signed mandates (AP2-inspired)
+
+Inspired by agent-payment mandates (Google AP2) and agentic-UPI safeguards: signed intent, signed approval, default-deny automation, tamper-evident logs.
+
+| Mandate | Signed by | Bound to | Effect |
+|---|---|---|---|
+| Policy (intent) | SIU lead | Policy version and hash, dual-control and automation scope | Without a valid one, `decide()` refuses every action ("Policy not authorised") |
+| Decision (cart) | Deciding investigator or lead | Case hash, evidence hash, policy hash, action, reason code | Executes, or waits as PENDING_APPROVAL for dual-control actions |
+| Execution (approval) | A different SIU lead (four-eyes) | Decision mandate hash | Executes REFER_TO_MFCU and creates its compliance obligations |
+| Revocation | SIU lead | Target mandate hash | Cancels a pending decision or a policy version |
+
+Automation is default-deny: the system actor may only route MONITOR / NEEDS_MORE_DATA. Mandates are canonical JSON → SHA-256 → Ed25519; demo keys live in `data/out/keys/` (production: SSO identities with HSM/KMS-held keys).
+
+```mermaid
+sequenceDiagram
+  actor Lead as SIU lead
+  actor Inv as Investigator
+  participant H as Harness
+  participant L as Ledger
+  Lead->>L: Policy mandate signed with version, hash and scope
+  Inv->>H: Decision mandate bound to case, evidence and policy hashes
+  H->>H: Verify signature, hashes, role and allowed action
+  alt dual-control action
+    H->>L: decision_mandate block, status PENDING_APPROVAL
+    Lead->>L: Execution mandate signed by a second person
+  else single control
+    H->>L: decision_mandate block, status EXECUTED
+  end
+  H->>L: compliance_event blocks for obligations of the executed decision
+```
+
+## Compliance (US payer)
+
+Obligations come only from human, executed decisions, never from model scores. Full map with where each item is implemented and tested: [docs/COMPLIANCE.md](docs/COMPLIANCE.md). Not legal advice; citations for orientation; state rules vary.
+
+| Obligation or control | Trigger | Due | Basis |
+|---|---|---|---|
+| Payment-suspension determination (suspend or documented good cause) | REFER_TO_MFCU executed | Next business day | 42 CFR 455.23 |
+| Written MFCU referral | REFER_TO_MFCU executed | Next business day (weekends skipped) | 42 CFR 455.23 |
+| MFCU certification | REFER_TO_MFCU executed | Every 90 days while open | 42 CFR 455.23 |
+| Report and return an overpayment | Reason OVERPAYMENT_IDENTIFIED | 60 days; 180-day good-faith pause only for Medicare A/B | 42 U.S.C. 1320a-7k(d); 42 CFR 401.305 |
+| Minimum necessary | Every table and brief | Member tokens, age bands, 3-digit ZIP; reveal needs a reason and is ledgered | 45 CFR 164.502(b) |
+| Audit controls and integrity | Every case view, reveal, decision and mandate | Hash chain + signatures | 45 CFR 164.312(b), 164.312(c)(1) |
+
 ## Results
 
 Synthetic run, SEED 42: 112,284 claims, 1,200 providers, 18 months. Ground truth exists only because the data is synthetic, and only `eval/` reads it. Full generated tables are in [docs/RESULTS.md](docs/RESULTS.md); code review findings are in [docs/REVIEW.md](docs/REVIEW.md).
@@ -248,7 +294,7 @@ Synthetic run, SEED 42: 112,284 claims, 1,200 providers, 18 months. Ground truth
 | 60 days | 0.980 / 0.967 | 0.894 / 0.931 | 0.849 / 0.5 (14) |
 | 90 days | 0.951 / 0.954 | 0.782 / 0.911 | 0.638 / 0.5 (15) |
 
-**Timings** (MacBook Air M3): generator about 1 s, full pipeline 8–15 s, page loads 0.1–0.5 s warm, 152 tests in about 30 s.
+**Timings** (MacBook Air M3): generator about 1 s, full pipeline 8–15 s, page loads 0.1–0.5 s warm, 186 tests in about 30 s.
 
 ## Responsible AI
 
@@ -256,7 +302,7 @@ Synthetic run, SEED 42: 112,284 claims, 1,200 providers, 18 months. Ground truth
 - **Fail-safe abstain.** Statistical-only evidence below threshold, or thin data, becomes `NEEDS_MORE_DATA`. The brief then lists what would change it (medical records sample, member verification calls, ownership documents). Missing data lowers confidence, never raises it.
 - **Evidence citations.** Every suspicion cites claim id, field, value, expected value or threshold, and source lens. Forecast drivers are shown in plain English.
 - **Fairness check.** Flag rates by provider type and specialty, overall and for clean providers only (0.0% in every group). Peer groups are specialty + type, so no specialty is judged against another.
-- **Audit ledger.** Every lens run, model run, policy change, brief and human decision is hash-chained. Editing any block breaks verification at that block.
+- **Audit ledger.** Every lens run, model run, policy change, signed mandate, brief, case view, PHI reveal and compliance event is hash-chained. Editing any block breaks verification at that block, and a tampered signed block also fails its signature check.
 - **Why not blockchain.** Claims data is PHI under HIPAA: it should not be replicated to outside parties, and immutable shared storage conflicts with correction and retention duties. A permissioned chain mainly adds consortium overhead to what is a single-organisation audit trail. The property that matters is tamper evidence, which a SHA-256 hash chain in the payer's own database provides. The ledger stores ids, scores and hashes, not claim lines.
 
 ## Honest limitations
@@ -289,7 +335,7 @@ Step by step:
 **Running tests**
 
 ```bash
-.venv/bin/python -m pytest -q                      # 152 tests
+.venv/bin/python -m pytest -q                      # 186 tests
 .venv/bin/python -m eval.pipeline_check            # policy invariants and recall (read-only)
 .venv/bin/python -m eval.report                    # regenerates docs/RESULTS.md
 ```
@@ -300,13 +346,13 @@ Step by step:
 
 ```
 claimshield/
-├── core/          # lenses, fusion, policy harness, queue, briefs, ledger, pipeline (never reads ground truth)
+├── core/          # lenses, fusion, policy harness, signed mandates, compliance, PHI controls, queue, briefs, ledger, pipeline (never reads ground truth)
 ├── data/gen/      # seeded synthetic generator, planted schemes, legitimate outliers
 ├── eval/          # recall, fairness, model vs baseline, exit checks, results report (only place ground truth is read)
 ├── policy/        # human-authored decision policy versions (harness_v1.yaml)
 ├── ui/            # Streamlit app, design system (style.py) and the six views
 ├── tests/         # pytest and Streamlit AppTest suites
-├── docs/          # RESULTS.md, REVIEW.md, screenshots
+├── docs/          # RESULTS.md, REVIEW.md, COMPLIANCE.md, screenshots
 ├── ARCHITECTURE.md
 ├── DEMO.md
 ├── requirements.txt
