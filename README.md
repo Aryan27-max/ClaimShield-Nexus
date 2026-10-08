@@ -49,15 +49,15 @@ Medicaid program-integrity teams get far more fraud, waste and abuse (FWA) signa
 <table>
   <tr>
     <td width="50%"><img src="docs/img/overview.png" alt="Overview page"><br><sub><b>Overview</b> — 9,061 flagged claims collapse into 63 cases needing investigator time; 7 fit this week.</sub></td>
-    <td width="50%"><img src="docs/img/queue.png" alt="SIU queue page"><br><sub><b>SIU Queue</b> — capacity-ranked slate; must-take cases first, over-capacity flagged for the SIU lead.</sub></td>
+    <td width="50%"><img src="docs/img/queue.png" alt="SIU queue page"><br><sub><b>SIU Queue</b> — capacity-ranked slate with next compliance deadline; must-take cases first.</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/img/case.png" alt="Ring case page"><br><sub><b>Ring case</b> — five providers sharing owner, address and bank, with every evidence row cited.</sub></td>
+    <td><img src="docs/img/case.png" alt="Ring case page"><br><sub><b>Ring case, Compliance tab</b> — regulatory basis and the obligations created by a dual-signed MFCU referral.</sub></td>
     <td><img src="docs/img/network.png" alt="Network page"><br><sub><b>Network</b> — ring members in red, referral loops in bold red, shared owner/address/bank links.</sub></td>
   </tr>
   <tr>
     <td><img src="docs/img/policy.png" alt="Policy page"><br><sub><b>Policy</b> — humans edit thresholds, preview the impact, then save a new hashed version.</sub></td>
-    <td><img src="docs/img/ledger.png" alt="Audit ledger page"><br><sub><b>Audit Ledger</b> — append-only SHA-256 chain with one-click verification.</sub></td>
+    <td><img src="docs/img/ledger.png" alt="Audit ledger page"><br><sub><b>Audit Ledger</b> — SHA-256 hash chain plus Ed25519 signature verification of every mandate.</sub></td>
   </tr>
 </table>
 
