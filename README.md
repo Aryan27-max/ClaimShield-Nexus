@@ -31,6 +31,18 @@
 | UI | Streamlit multipage app, Plotly charts |
 | Testing | pytest, Streamlit AppTest, fresh-clone end-to-end check |
 
+## Live demo
+
+**<DEPLOY_URL>** (public demo · synthetic data only · state shared by all visitors; use **Reset demo** in the sidebar to start over).
+
+Deploy your own on Streamlit Community Cloud:
+
+1. Sign in at [share.streamlit.io](https://share.streamlit.io) with the GitHub account that can read the repository.
+2. **Create app** → **Deploy a public app from GitHub**.
+3. Repository `Aryan27-max/ClaimShield-Nexus`, branch `main`, main file path `ui/app.py`.
+4. **Advanced settings** → Python version **3.11**. No secrets are needed.
+5. **Deploy.** Community Cloud installs `requirements.txt` and `packages.txt` (`libgomp1` for LightGBM). The first visit builds the synthetic data, models, ledger and demo signing keys (about 20 s, with a spinner); later visits reuse them until the app restarts, because the disk is ephemeral.
+
 ## Overview
 
 Medicaid program-integrity teams get far more fraud, waste and abuse (FWA) signals than their Special Investigations Unit (SIU) can work, and most come as unexplained scores or thousands of raw claim-line flags. ClaimShield Nexus turns claims into a short, capacity-ranked list of cases. Each case comes with cited evidence, an honest confidence, its limitations and the actions a human-authored policy allows. Models only propose: the final action is always a recorded human decision, and every step lands in a tamper-evident ledger. Built for the Acentra Health healthcare-payer FWA challenge, using **synthetic data only** (no PHI, fixed seed).
