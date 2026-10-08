@@ -1,5 +1,6 @@
 """Decision harness: human-authored policy YAML -> allowed / recommended actions with a rule trace.
 decide() is the only writer of final actions (human user_id + reason_code, ledgered)."""
+import copy
 import hashlib
 import sqlite3
 from datetime import datetime, timezone
@@ -176,3 +177,70 @@ def decide(case_id: str, action: str, user_id: str, reason_code: str, note: str 
 def decisions(db=None) -> pd.DataFrame:
     with _db(db) as con:
         return pd.read_sql("SELECT * FROM decisions ORDER BY decision_id", con)
+
+
+THRESHOLDS = {  # dotted policy path -> label shown on the Policy page
+    "abstain.statistical_min": "Abstain: statistical-only fused score below",
+    "actions.PREPAY_REVIEW.any_of.1.min_class_score.statistical": "E/M upcoding path: statistical score floor",
+    "actions.PREPAY_REVIEW.any_of.1.min_conf": "E/M upcoding path: min confidence",
+    "predictive.lift_min": "Predictive lift: p_fwa(90) at least",
+    "predictive.statistical_min": "Predictive lift: statistical score floor",
+    "actions.FULL_INVESTIGATION.min_conf": "FULL_INVESTIGATION: min confidence",
+    "actions.REFER_TO_MFCU.min_conf": "REFER_TO_MFCU: min confidence",
+    "actions.REFER_TO_MFCU.min_dollars": "REFER_TO_MFCU: min $ at risk",
+    "capacity.hours_per_investigator_week": "Hours per investigator per week",
+}
+
+
+def _walk(d, path: str):
+    *head, last = path.split(".")
+    for k in head:
+        d = d[int(k)] if isinstance(d, list) else d[k]
+    return d, (int(last) if isinstance(d, list) else last)
+
+
+def get_threshold(policy: dict, path: str):
+    d, k = _walk(policy, path)
+    return d[k]
+
+
+def with_thresholds(policy: dict, values: dict) -> dict:
+    """Unsaved copy of the policy with dotted-path thresholds replaced; `_hash` is provisional (preview only)."""
+    pol = copy.deepcopy({k: v for k, v in policy.items() if not k.startswith("_")})
+    for path, v in values.items():
+        d, k = _walk(pol, path)
+        d[k] = v
+    pol["_hash"] = hashlib.sha256(yaml.safe_dump(pol, sort_keys=True).encode()).hexdigest()
+    pol["_path"] = "(unsaved preview)"
+    return pol
+
+
+def diff(cases: pd.DataFrame, old: dict, new: dict) -> pd.DataFrame:
+    """Cases whose recommended action changes between two policies, with the first new rule-trace line as `why`."""
+    base = cases.drop(columns=OUTPUT_COLS, errors="ignore")
+    a, b = evaluate_all(base, old), evaluate_all(base, new)
+    ch = a.recommended_action != b.recommended_action
+    why = [next((t for t in nt if t not in set(ot)), nt[0] if len(nt) else "")
+           for ot, nt in zip(a.rule_trace[ch], b.rule_trace[ch])]
+    return pd.DataFrame({"case_id": a.case_id[ch], "before": a.recommended_action[ch],
+                         "after": b.recommended_action[ch], "why": why})
+
+
+def save_version(policy: dict, author: str, reason: str, old: dict, folder: Path | str | None = None, db=None) -> dict:
+    """Writes policy/harness_vN.yaml (N = next free version; never overwrites) and a `policy_change` ledger block."""
+    if not str(author).strip() or not str(reason).strip():
+        raise ValueError("author and change reason are required")
+    folder = Path(folder or Path(S.POLICY).parent)
+    n = 1 + max(int(p.stem.rsplit("v", 1)[-1]) for p in folder.glob("harness_v*.yaml"))
+    path = folder / f"harness_v{n}.yaml"
+    body = {**{k: v for k, v in policy.items() if not k.startswith("_")}, "version": n, "name": f"harness_v{n}",
+            "author": author, "created": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "change_reason": reason,
+            "parent_hash": old["_hash"]}
+    with open(path, "x") as f:
+        f.write("# Human-authored decision policy. Models propose; this policy constrains; a human decides.\n")
+        yaml.safe_dump(body, f, sort_keys=False, allow_unicode=True)
+    new = load_policy(path)
+    entry = ledger.append(f"human:{author}", "policy_change", {
+        "old_version": old["version"], "old_hash": old["_hash"], "new_version": n, "new_hash": new["_hash"],
+        "path": path.name, "author": author, "reason": reason}, db)
+    return {"path": str(path), "hash": new["_hash"], "version": n, "ledger_idx": entry["idx"]}

@@ -7,7 +7,8 @@ from streamlit.testing.v1 import AppTest
 from core import schema as S
 
 APP = str(S.ROOT / "ui" / "app.py")
-PAGES = ["pages/2_Queue.py", "pages/3_Case.py", "pages/6_Ledger.py"]
+PAGES = ["pages/1_Overview.py", "pages/2_Queue.py", "pages/3_Case.py", "pages/4_Network.py", "pages/5_Policy.py",
+         "pages/6_Ledger.py"]
 WARM_MAX_S = 3.0
 
 

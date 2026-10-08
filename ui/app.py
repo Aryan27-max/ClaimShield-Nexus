@@ -12,8 +12,11 @@ from ui import style as U  # noqa: E402
 st.set_page_config(page_title="ClaimShield Nexus", page_icon=":shield:", layout="wide")
 U.inject_css()
 
-PAGES = [st.Page("pages/2_Queue.py", title="SIU Queue", icon=":material/format_list_numbered:", default=True),
+PAGES = [st.Page("pages/1_Overview.py", title="Overview", icon=":material/insights:", default=True),
+         st.Page("pages/2_Queue.py", title="SIU Queue", icon=":material/format_list_numbered:"),
          st.Page("pages/3_Case.py", title="Case", icon=":material/folder_open:"),
+         st.Page("pages/4_Network.py", title="Network", icon=":material/hub:"),
+         st.Page("pages/5_Policy.py", title="Policy", icon=":material/gavel:"),
          st.Page("pages/6_Ledger.py", title="Audit Ledger", icon=":material/link:")]
 nav = st.navigation(PAGES)
 
@@ -23,6 +26,8 @@ with st.sidebar:
     st.divider()
     files = C.policy_files()
     st.session_state.setdefault("policy_path", files[0] if files else str(C.S.POLICY))
+    if st.session_state.get("pending_policy") in files:  # set by the Policy page after "Save as new version"
+        st.session_state["policy_path"] = st.session_state.pop("pending_policy")
     pol = C.policy(st.session_state["policy_path"])
     st.selectbox("Policy version", files, key="policy_path",
                  format_func=lambda p: f"v{C.policy(p)['version']} · {Path(p).stem} · {C.policy(p)['_hash'][:10]}")

@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from core import harness
+from core import brief, harness
 from ui import common as C
 from ui import style as U
 
@@ -36,8 +36,8 @@ if r.recommended_action == "NEEDS_MORE_DATA":
 if r.requires_human:
     st.info("REFER_TO_MFCU is allowed for this case and always requires a human decision.")
 
-tab_ev, tab_risk, tab_tl, tab_net, tab_why = st.tabs(["Evidence", "Risk forecast", "Timeline", "Network",
-                                                     "Why this action"])
+tab_ev, tab_risk, tab_tl, tab_net, tab_why, tab_brief = st.tabs(
+    ["Evidence", "Risk forecast", "Timeline", "Network", "Why this action", "Brief"])
 with tab_ev, U.card("evidence"):
     ev = pd.DataFrame(list(r.evidence))
     if len(ev):
@@ -95,6 +95,24 @@ with tab_why, U.card("why"):
     st.subheader("Why not a higher action")
     st.code("\n".join(r.rule_trace), language=None)
     st.caption(f"Policy v{r.policy_version} · {r.policy_hash[:16]} · allowed: {', '.join(r.allowed_actions)}")
+
+with tab_brief, U.card("brief"):
+    key = f"brief_{case_id}_{r.policy_hash[:12]}"
+    st.caption("Deterministic template brief: every sentence is filled from case data. Generating it appends a "
+               "`brief_generated` block with the brief's SHA-256 to the ledger.")
+    if st.button("Generate brief", key="gen_brief"):
+        actor = f"human:{st.session_state['user_id']}" if st.session_state.get("user_id") else "system:brief"
+        st.session_state[key] = brief.generate({**r.to_dict(), "case_id": case_id}, pol,
+                                               C.claims(C._mtime(C.S.OUT / "claims.parquet")),
+                                               C.table("providers"), C.table("graph_features"), C.meta(), actor=actor)
+    b = st.session_state.get(key)
+    if b:
+        a1, a2, a3 = st.columns([1, 1, 2])
+        a1.download_button("Download .md", b["markdown"], file_name=f"brief_{case_id}.md", mime="text/markdown")
+        a2.download_button("Download .html (print to PDF)", U.print_html(b["markdown"], f"Brief {case_id}"),
+                           file_name=f"brief_{case_id}.html", mime="text/html")
+        a3.caption(f"Ledger block #{b['ledger_idx']} · sha256 {b['sha256'][:16]} · {b['generated_at']}")
+        st.markdown(b["markdown"])
 
 st.write("")
 with U.card("decision"):

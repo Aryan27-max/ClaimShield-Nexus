@@ -1,6 +1,5 @@
 """P3 exit check: funnel, top queue, action matrix by ground-truth label, policy invariants, runtime.
 Eval may read ground_truth / legit_outliers; the pipeline may not. Run: python -m eval.pipeline_check"""
-import copy
 import sys
 
 import pandas as pd
@@ -8,32 +7,9 @@ import pandas as pd
 from core import harness, pipeline
 from core import queue as Q
 from core import schema as S
+from eval.metrics import DEMO_THRESHOLDS, HIGH, action_matrix, provider_actions, validation
 
 MAX_RUNTIME_S = 60
-HIGH = ["PREPAY_REVIEW", "FULL_INVESTIGATION", "REFER_TO_MFCU"]
-COLS = harness.ACTIONS[::-1] + ["no_case"]
-
-
-def entity_labels() -> pd.DataFrame:
-    gt = S.load("ground_truth").rename(columns={"scheme": "label"})[["entity_id", "label"]]
-    lo = S.load("legit_outliers").rename(columns={"kind": "label"})[["entity_id", "label"]]
-    lo["label"] = lo.label.replace({"high_cost_oncology": "oncology"})
-    lab = pd.concat([gt, lo]).astype(str)
-    p = S.load("providers").provider_id.astype(str)
-    clean = pd.DataFrame({"entity_id": p[~p.isin(lab.entity_id)], "label": "clean"})
-    return pd.concat([lab, clean], ignore_index=True)
-
-
-def provider_actions(cases: pd.DataFrame) -> pd.DataFrame:
-    return cases[["case_id", "providers", "recommended_action", "classes"]].explode("providers") \
-        .rename(columns={"providers": "entity_id"})
-
-
-def action_matrix(cases: pd.DataFrame) -> pd.DataFrame:
-    m = entity_labels().merge(provider_actions(cases), on="entity_id", how="left")
-    m["recommended_action"] = m.recommended_action.fillna("no_case")
-    mat = pd.crosstab(m.label, m.recommended_action).reindex(columns=COLS, fill_value=0)
-    return mat, m
 
 
 def checks(cases: pd.DataFrame, mat: pd.DataFrame, m: pd.DataFrame, policy: dict, runtime: float) -> list[tuple[str, bool]]:
@@ -60,15 +36,6 @@ def checks(cases: pd.DataFrame, mat: pd.DataFrame, m: pd.DataFrame, policy: dict
     return out
 
 
-def upcoding_at_prepay(cases: pd.DataFrame, policy: dict, **predictive) -> int:
-    """Upcoding entities at PREPAY_REVIEW+ when re-evaluated with the given predictive thresholds."""
-    pol = copy.deepcopy(policy)
-    pol["predictive"].update(predictive)
-    base = cases.drop(columns=harness.OUTPUT_COLS)
-    mat, _ = action_matrix(harness.evaluate_all(base, pol))
-    return int(mat.loc["upcoding", HIGH].sum())
-
-
 def main() -> int:
     meta = pipeline.run_all()
     cases, policy = pd.read_parquet(S.CASES), harness.load_policy()
@@ -82,11 +49,10 @@ def main() -> int:
                       "members_affected", "est_hours", "priority", "status"]].to_string(index=False))
     mat, m = action_matrix(cases)
     print(mat.to_string())
-    pr = policy["predictive"]
-    print(f"upcoding at PREPAY+: before (no predictive lift) {upcoding_at_prepay(cases, policy, lift_min=2.0)} -> "
-          f"after (policy lift_min {pr['lift_min']}, statistical_min {pr['statistical_min']}) "
-          f"{upcoding_at_prepay(cases, policy)}; sensitivity lift_min 0.6 + statistical_min 0.55 -> "
-          f"{upcoding_at_prepay(cases, policy, lift_min=0.6, statistical_min=0.55)}")
+    before, after = validation(cases), validation(harness.evaluate_all(
+        cases.drop(columns=harness.OUTPUT_COLS), harness.with_thresholds(policy, DEMO_THRESHOLDS)))
+    print(f"policy demo {DEMO_THRESHOLDS}: upcoding PREPAY+ {before['upcoding_prepay_plus']} -> "
+          f"{after['upcoding_prepay_plus']}, clean escalated {before['clean_escalated']} -> {after['clean_escalated']}")
     res = checks(cases, mat, m, policy, meta["timings"]["total"])
     for name, ok in res:
         print(("PASS " if ok else "FAIL ") + name)

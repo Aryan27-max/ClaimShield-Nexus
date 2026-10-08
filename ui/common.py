@@ -97,3 +97,45 @@ def ego_html(entity_id: str, highlight: list[str], max_nodes: int = 150) -> tupl
                      width=2 if d.get("rel") == "refers" else 1)
     net.toggle_physics(True)
     return net.generate_html(), sub.number_of_nodes()
+
+
+@st.cache_data(show_spinner=False)
+def _table(name: str, mtime: float) -> pd.DataFrame:
+    return S.load(name)
+
+
+def table(name: str) -> pd.DataFrame:
+    """Any data/out table, cached per file version."""
+    return _table(name, _mtime(S.OUT / f"{name}.parquet"))
+
+
+@st.cache_data(show_spinner=False)
+def _flows(mtime: float) -> pd.DataFrame:
+    c = S.load("claims")[["referring_provider_id", "provider_id"]].dropna().astype(str)
+    return c.groupby(["referring_provider_id", "provider_id"]).size().rename("n").reset_index()
+
+
+def referral_flows() -> pd.DataFrame:
+    """Referred claims per (referring provider, billing provider)."""
+    return _flows(_mtime(S.OUT / "claims.parquet"))
+
+
+@st.cache_data(show_spinner=False)
+def _model_baseline(mtime: float) -> pd.DataFrame:
+    from eval.metrics import model_vs_baseline
+    return model_vs_baseline()
+
+
+def model_baseline() -> pd.DataFrame:
+    return _model_baseline(_mtime(S.OUT / "snapshots.parquet"))
+
+
+@st.cache_data(show_spinner=False)
+def _labels(mtime: float) -> pd.DataFrame:
+    from eval.metrics import entity_labels
+    return entity_labels()
+
+
+def labels() -> pd.DataFrame:
+    """Ground-truth entity labels: for the synthetic-validation sections only (never fed to core)."""
+    return _labels(_mtime(S.OUT / "ground_truth.parquet"))
