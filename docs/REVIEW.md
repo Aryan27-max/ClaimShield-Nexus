@@ -46,3 +46,15 @@ Full read of `core/`, `ui/`, `eval/`, `data/gen/`, `tests/` and `policy/` (sessi
 | pandas pitfalls | Every groupby on a categorical column uses `observed=True` or casts to `str` first. Ratios guard against division by zero (`np.maximum`, `.where(scale > 0)`). | ok |
 | Determinism | `SEED=42` drives every RNG (generator, IsolationForest, Louvain, LightGBM). The generator is byte-identical across runs (test). | ok |
 | Security | YAML only via `safe_load` / `safe_dump`. No `eval` / `exec`. SQL is parameterised. File paths are never user-controlled (new policy path = fixed folder + next version number). The HTML brief export escapes every value. | ok |
+
+## Visual QA (headless Chrome screenshots of all six pages)
+
+| # | Page | Defect | Fix | Status |
+|---|---|---|---|---|
+| V1 | all | Button labels rendered dark navy on the blue button (the global markdown colour overrode white). | White label rule for buttons; disabled buttons grey on light grey. | fixed |
+| V2 | all | Action names shown as "Refer To Mfcu" (naive title case). | `ACTION_LABELS` in `ui/style.py` used by badges, charts and the queue table. | fixed |
+| V3 | Overview | Charts sat on a grey panel inside white cards, the funnel's top label was clipped, and axis labels were cut off. | `U.plot()` sets figure backgrounds and keeps the design-system template (Streamlit's chart theme had overridden it), with axis automargin and unclipped labels. | fixed |
+| V4 | Overview, Queue, Case, Ledger | Tiles had uneven heights when text wrapped, and hash values broke across lines. | Uniform tile height; a smaller value style for hashes and names. | fixed |
+| V5 | Queue, Case, Network | Tables overflowed their cards (status, classes and entity columns cut off; shared-attribute rows truncated). | Explicit column widths, redundant columns dropped, shared attributes as a readable list. | fixed |
+| V6 | Network | 150-node ego graph drew every referral in bold red, so the ring's own loops and shared owner/address/bank links were lost. | Bold red only for referrals between the case's providers, pale red for the rest, and shared-entity links in their legend colours. | fixed |
+| V7 | all | On first load the sidebar briefly showed Streamlit's auto-discovered `pages/` list (with an "app" entry) before `st.navigation` took over. | Renamed `ui/pages/` to `ui/views/` (URLs unchanged: they come from file names). | fixed |

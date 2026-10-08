@@ -12,12 +12,12 @@ from ui import style as U  # noqa: E402
 st.set_page_config(page_title="ClaimShield Nexus", page_icon=":shield:", layout="wide")
 U.inject_css()
 
-PAGES = [st.Page("pages/1_Overview.py", title="Overview", icon=":material/insights:", default=True),
-         st.Page("pages/2_Queue.py", title="SIU Queue", icon=":material/format_list_numbered:"),
-         st.Page("pages/3_Case.py", title="Case", icon=":material/folder_open:"),
-         st.Page("pages/4_Network.py", title="Network", icon=":material/hub:"),
-         st.Page("pages/5_Policy.py", title="Policy", icon=":material/gavel:"),
-         st.Page("pages/6_Ledger.py", title="Audit Ledger", icon=":material/link:")]
+PAGES = [st.Page("views/1_Overview.py", title="Overview", icon=":material/insights:", default=True),
+         st.Page("views/2_Queue.py", title="SIU Queue", icon=":material/format_list_numbered:"),
+         st.Page("views/3_Case.py", title="Case", icon=":material/folder_open:"),
+         st.Page("views/4_Network.py", title="Network", icon=":material/hub:"),
+         st.Page("views/5_Policy.py", title="Policy", icon=":material/gavel:"),
+         st.Page("views/6_Ledger.py", title="Audit Ledger", icon=":material/link:")]
 nav = st.navigation(PAGES)
 
 with st.sidebar:

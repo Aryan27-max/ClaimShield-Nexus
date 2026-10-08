@@ -7,8 +7,8 @@ from streamlit.testing.v1 import AppTest
 from core import schema as S
 
 APP = str(S.ROOT / "ui" / "app.py")
-PAGES = ["pages/1_Overview.py", "pages/2_Queue.py", "pages/3_Case.py", "pages/4_Network.py", "pages/5_Policy.py",
-         "pages/6_Ledger.py"]
+PAGES = ["views/1_Overview.py", "views/2_Queue.py", "views/3_Case.py", "views/4_Network.py", "views/5_Policy.py",
+         "views/6_Ledger.py"]
 WARM_MAX_S = 3.0
 
 
@@ -25,7 +25,7 @@ def load(page: str, network: bool = False) -> tuple[float, bool]:
 
 def main() -> int:
     ok = True
-    for page in PAGES + ["pages/3_Case.py+network"]:
+    for page in PAGES + ["views/3_Case.py+network"]:
         p, net = page.split("+")[0], page.endswith("network")
         cold, c_ok = load(p, net)
         warm, w_ok = load(p, net)

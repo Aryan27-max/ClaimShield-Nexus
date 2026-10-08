@@ -12,6 +12,9 @@ ACCENT_SOFT = "#C9DDF6"
 FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif'
 ACTION_COLORS = {"REFER_TO_MFCU": RED, "FULL_INVESTIGATION": ORANGE, "PREPAY_REVIEW": ACCENT,
                  "PROVIDER_EDUCATION": GREEN, "NEEDS_MORE_DATA": GRAY, "MONITOR": LIGHT_GRAY}
+ACTION_LABELS = {"REFER_TO_MFCU": "Refer to MFCU", "FULL_INVESTIGATION": "Full investigation",
+                 "PREPAY_REVIEW": "Prepay review", "PROVIDER_EDUCATION": "Provider education",
+                 "NEEDS_MORE_DATA": "Needs more data", "MONITOR": "Monitor"}
 STATUS_COLORS = {"in_capacity": GREEN, "over_capacity": RED, "deferred": ORANGE, "not_queued": GRAY}
 TONES = {"blue": (ACCENT, "#E8F2FD"), "green": ("#248A3D", "#E9F8EE"), "orange": ("#C93400", "#FFF4E5"),
          "red": ("#D70015", "#FFEBEA"), "gray": (SECONDARY, "#F2F2F7")}
@@ -19,7 +22,8 @@ CLASS_TONES = {"deterministic": "blue", "structural": "orange", "statistical": "
 PALETTE = [ACCENT, ORANGE, GREEN, RED, "#AF52DE", "#5AC8FA", GRAY]
 NODE_COLORS = {"provider": ACCENT, "member": LIGHT_GRAY, "owner": ORANGE, "address": GREEN, "bank": "#AF52DE",
                "highlight": RED}
-EDGE_COLORS = {"refers": RED, "default": HAIRLINE}
+EDGE_COLORS = {"refers": RED, "refers_other": "#F6C9C5", "default": HAIRLINE,
+               "owner": ORANGE, "address": GREEN, "bank": "#AF52DE"}
 PYVIS_HIDE_LOADING = "<style>#loadingBar { display: none !important; }</style>"
 SHADOW = "0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04)"
 
@@ -43,12 +47,13 @@ header[data-testid="stHeader"] {{ background: transparent; }}
 div[class*="st-key-card_"] {{ background: {CARD}; border-radius: 18px; box-shadow: {SHADOW}; padding: 24px;
   transition: box-shadow 150ms ease; }}
 div[class*="st-key-card_"]:hover {{ box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.06); }}
-.cs-tile {{ background: {CARD}; border-radius: 18px; box-shadow: {SHADOW}; padding: 18px 20px; min-height: 104px;
+.cs-tile {{ background: {CARD}; border-radius: 18px; box-shadow: {SHADOW}; padding: 18px 20px; min-height: 152px;
   transition: transform 150ms ease; }}
 .cs-tile:hover {{ transform: translateY(-1px); }}
 .cs-tile .l {{ color: {SECONDARY}; font-size: 13px; font-weight: 500; }}
 .cs-tile .v {{ font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin-top: 4px; }}
 .cs-tile .d {{ font-size: 13px; margin-top: 2px; color: {SECONDARY}; }}
+.cs-tile .v.sm {{ font-size: 22px; line-height: 1.6; letter-spacing: 0; }}
 .cs-chip {{ display: inline-block; padding: 3px 10px; border-radius: 980px; font-size: 12px; font-weight: 600;
   margin: 0 6px 4px 0; letter-spacing: 0; }}
 .cs-badge {{ display: inline-block; padding: 4px 12px; border-radius: 980px; font-size: 12px; font-weight: 600;
@@ -59,7 +64,9 @@ div[class*="st-key-card_"]:hover {{ box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px
   font-weight: 500; padding: 0.45rem 1.2rem; transition: filter 150ms ease, transform 150ms ease; }}
 .stButton button:hover, .stFormSubmitButton button:hover {{ filter: brightness(1.08); }}
 .stButton button:active, .stFormSubmitButton button:active {{ transform: scale(.98); }}
-.stButton button:disabled {{ background: {LIGHT_GRAY} !important; }}
+.stButton button p, .stFormSubmitButton button p, .stDownloadButton button p {{ color: #fff !important; }}
+.stButton button:disabled, .stFormSubmitButton button:disabled {{ background: {HAIRLINE} !important; }}
+.stButton button:disabled p, .stFormSubmitButton button:disabled p {{ color: {GRAY} !important; }}
 .st-key-verify button {{ font-size: 19px !important; padding: 0.8rem 2.6rem !important; min-height: 3.2rem; }}
 [data-testid="stDataFrame"] {{ border: none !important; border-radius: 14px; overflow: hidden; }}
 [data-testid="stExpander"] details {{ border: none; background: {CARD}; border-radius: 14px; box-shadow: {SHADOW}; }}
@@ -88,11 +95,12 @@ def card(key: str):
     return st.container(key=f"card_{key}")
 
 
-def metric_tile(label: str, value, delta: str | None = None, tone: str | None = None) -> None:
+def metric_tile(label: str, value, delta: str | None = None, tone: str | None = None, small: bool = False) -> None:
+    """Rounded stat tile; `small` for long values such as hashes or names."""
     color = TONES[tone][0] if tone else TEXT
     d = f'<div class="d">{html.escape(str(delta))}</div>' if delta else ""
     st.markdown(f'<div class="cs-tile"><div class="l">{html.escape(label)}</div>'
-                f'<div class="v" style="color:{color}">{html.escape(str(value))}</div>{d}</div>',
+                f'<div class="v{" sm" if small else ""}" style="color:{color}">{html.escape(str(value))}</div>{d}</div>',
                 unsafe_allow_html=True)
 
 
@@ -101,10 +109,14 @@ def chip(text: str, tone: str = "gray") -> str:
     return f'<span class="cs-chip" style="color:{fg};background:{bg}">{html.escape(text)}</span>'
 
 
+def action_label(action: str) -> str:
+    return ACTION_LABELS.get(action, action.replace("_", " ").capitalize())
+
+
 def action_badge(action: str) -> str:
     c = ACTION_COLORS.get(action, GRAY)
     fg = TEXT if action == "MONITOR" else "#fff"
-    return f'<span class="cs-badge" style="background:{c};color:{fg}">{action.replace("_", " ").title()}</span>'
+    return f'<span class="cs-badge" style="background:{c};color:{fg}">{action_label(action)}</span>'
 
 
 def class_chips(classes) -> str:
@@ -124,19 +136,28 @@ def result_card(ok: bool, text: str) -> None:
 def table_style(df, action_col: str | None = None, status_col: str | None = None):
     """Pandas Styler colouring action / status text (dataframes can't render HTML badges)."""
     sty = df.style
+    acts = {**ACTION_COLORS, **{ACTION_LABELS[a]: c for a, c in ACTION_COLORS.items()}}
+    stats = {**STATUS_COLORS, **{s.replace("_", " "): c for s, c in STATUS_COLORS.items()}}
     if action_col:
-        sty = sty.map(lambda v: f"color:{ACTION_COLORS.get(v, TEXT)};font-weight:600", subset=[action_col])
+        sty = sty.map(lambda v: f"color:{acts.get(v, TEXT)};font-weight:600", subset=[action_col])
     if status_col:
-        sty = sty.map(lambda v: f"color:{STATUS_COLORS.get(v, TEXT)};font-weight:500", subset=[status_col])
+        sty = sty.map(lambda v: f"color:{stats.get(v, TEXT)};font-weight:500", subset=[status_col])
     return sty
+
+
+def plot(fig: go.Figure, container=None) -> None:
+    """Plotly chart in this design system. Backgrounds are set on the figure itself: Streamlit injects its page
+    background unless the layout (not the template) defines one."""
+    fig.update_layout(paper_bgcolor=CARD, plot_bgcolor=CARD)
+    (container or st).plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False, "responsive": True})
 
 
 def plotly_template() -> go.layout.Template:
     return go.layout.Template(layout=dict(
         font=dict(family=FONT, color=TEXT, size=13), colorway=PALETTE,
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(showgrid=False, zeroline=False, linecolor=HAIRLINE, ticks=""),
-        yaxis=dict(showgrid=True, gridcolor="#EDEDF0", zeroline=False, ticks=""),
+        paper_bgcolor=CARD, plot_bgcolor=CARD,  # charts always sit in white cards
+        xaxis=dict(showgrid=False, zeroline=False, linecolor=HAIRLINE, ticks="", automargin=True),
+        yaxis=dict(showgrid=True, gridcolor="#EDEDF0", zeroline=False, ticks="", automargin=True),
         legend=dict(orientation="h", y=1.12, x=0, bgcolor="rgba(0,0,0,0)"),
         margin=dict(l=8, r=8, t=24, b=8), hoverlabel=dict(font=dict(family=FONT), bgcolor=CARD)))
 

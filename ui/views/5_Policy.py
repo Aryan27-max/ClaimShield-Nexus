@@ -23,7 +23,7 @@ tiles = [("Active version", f"v{pol['version']}", Path(pol["_path"]).name), ("Po
          ("Author", pol.get("author", "—"), pol.get("change_reason", "initial policy")[:40]), ("Created", created, "")]
 for col, (label, value, delta) in zip(st.columns(len(tiles)), tiles):
     with col:
-        U.metric_tile(label, value, delta)
+        U.metric_tile(label, value, delta, small=label == "Author")
 st.write("")
 
 values, avail = {}, PE.available_thresholds(pol)
@@ -67,7 +67,7 @@ if st.session_state.get("preview_of") == changed and changed:
                          go.Bar(x=counts.index.str.replace("_", " ").str.title(), y=counts.after, name="After",
                                 marker_color=U.ACCENT)])
         fig.update_layout(template=U.plotly_template(), barmode="group", height=280)
-        st.plotly_chart(fig, width="stretch")
+        U.plot(fig)
         st.dataframe(counts, width="stretch")
     with b, U.card("changes"):
         st.subheader(f"{len(d)} case(s) change action")

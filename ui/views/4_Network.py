@@ -43,17 +43,17 @@ with left, U.card("ego"):
     U.html_line(U.legend({"provider": U.NODE_COLORS["provider"], "member": U.NODE_COLORS["member"],
                           "owner": U.NODE_COLORS["owner"], "address": U.NODE_COLORS["address"],
                           "bank": U.NODE_COLORS["bank"], "selected / ring member": U.NODE_COLORS["highlight"]}))
-    st.caption(f"{n} nodes (cap 150) · red edges = referrals")
+    st.caption(f"{n} nodes (cap 150) · bold red = referrals between these providers · pale red = other referrals · "
+               "orange / green / purple = shared owner / address / bank")
     st.iframe(html, height=540)
 with right:
     with U.card("shared"):
         st.subheader("Shared attributes")
-        rows = []
         for col, n_col in [("owner_id", "shared_owner_n"), ("address_id", "shared_address_n"), ("bank_id", "shared_bank_n")]:
             for v, grp in p.groupby(col):
-                rows.append({"attribute": col.removesuffix("_id"), "value": v, "case providers": ", ".join(grp.index),
-                             "other providers": int(g.loc[grp.index, n_col].max())})
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+                outside = int(g.loc[grp.index, n_col].max()) - (len(grp) - 1)
+                st.markdown(f"**{col.removesuffix('_id').capitalize()}** `{v}` · {len(grp)} of these providers"
+                            + (f" + {outside} outside" if outside > 0 else ""))
     st.write("")
     with U.card("flows"):
         st.subheader("Referral flows")
@@ -62,12 +62,14 @@ with right:
                                 ("In (top 5)", "provider_id", "referring_provider_id")]:
             sub = fl[fl[src].isin(pids)]
             top = sub.groupby(dst).n.sum().sort_values(ascending=False)
-            t = pd.DataFrame({"provider": top.index, "referred claims": top.values,
+            t = pd.DataFrame({"provider": top.index, "claims": top.values,
                               "share": (top / max(top.sum(), 1)).round(2).values}).head(5)
             t["in case"] = t.provider.isin(pids)
             st.markdown(f"**{title}**")
-            st.dataframe(t, hide_index=True, width="stretch",
-                         column_config={"share": st.column_config.ProgressColumn("share", min_value=0, max_value=1)})
+            st.dataframe(t, hide_index=True, width="stretch", column_config={
+                "provider": st.column_config.TextColumn(width=75), "claims": st.column_config.NumberColumn(width=65),
+                "share": st.column_config.ProgressColumn("share", min_value=0, max_value=1, width=115),
+                "in case": st.column_config.CheckboxColumn(width=60)})
 
 st.write("")
 with U.card("rings"):
@@ -88,5 +90,5 @@ with U.card("rings"):
             st.rerun()
         if cols[2 * i + 1].button(f"Open case {rid}", key=f"open_{rid}", width="stretch"):
             st.session_state["case_id"] = rid
-            st.switch_page("pages/3_Case.py")
+            st.switch_page("views/3_Case.py")
 st.caption(C.FOOTER)

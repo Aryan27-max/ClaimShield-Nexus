@@ -42,8 +42,12 @@ tab_ev, tab_risk, tab_tl, tab_net, tab_why, tab_brief = st.tabs(
 with tab_ev, U.card("evidence"):
     ev = pd.DataFrame(list(r.evidence))
     if len(ev):
-        st.dataframe(ev[["claim_id", "field", "value", "expected", "lens", "class", "code", "entity_id"]],
-                     hide_index=True, width="stretch", height=360)
+        st.dataframe(ev[["claim_id", "field", "value", "expected", "class", "code", "entity_id"]],
+                     hide_index=True, width="stretch", height=360, column_config={
+                         "claim_id": st.column_config.TextColumn(width=85), "field": st.column_config.TextColumn(width=125),
+                         "value": st.column_config.TextColumn(width=190), "expected": st.column_config.TextColumn(width=285),
+                         "class": st.column_config.TextColumn(width=80), "code": st.column_config.TextColumn(width=50),
+                         "entity_id": st.column_config.TextColumn("entity", width=85)})
     d = st.columns(3)
     for col, (label, v) in zip(d, [("Deterministic $ (flagged claims)", r.dollars_deterministic),
                                    ("Structural $ (flagged claims)", r.dollars_structural),
@@ -61,7 +65,7 @@ with tab_risk, U.card("risk"):
                                text=[f"{r[f'p_{h}']:.0%}" for h in hs], textposition="outside", width=0.5))
         fig.update_layout(template=U.plotly_template(), height=300,
                           yaxis=dict(range=[0, 1.15], tickformat=".0%", title="P(escalation)"))
-        a.plotly_chart(fig, width="stretch")
+        U.plot(fig, a)
         with b:
             st.markdown(f"**Top drivers** · provider {r.driver_provider}")
             for d in r.drivers:
@@ -80,13 +84,13 @@ with tab_tl, U.card("timeline"):
     fig = go.Figure([go.Bar(x=tl.index, y=tl[False], name="Paid (not flagged)", marker_color=U.ACCENT_SOFT),
                      go.Bar(x=tl.index, y=tl[True], name="Paid (flagged)", marker_color=U.RED)])
     fig.update_layout(template=U.plotly_template(), barmode="stack", height=360, yaxis_title="Paid $ per month")
-    st.plotly_chart(fig, width="stretch")
+    U.plot(fig)
 
 with tab_net, U.card("network"):
     if st.toggle("Show ego network (≤ 150 nodes)", value=False, key=f"net_{case_id}"):
         html, n = C.ego_html(case_id if r.case_type == "ring" else r.providers[0], list(r.providers))
-        st.caption(f"{n} nodes · red = case providers and referral edges · blue providers · orange owners · "
-                   "green addresses · purple banks · grey members")
+        st.caption(f"{n} nodes · red = case providers; bold red edges = referrals between them · blue providers · "
+                   "orange owners · green addresses · purple banks · grey members")
         st.iframe(html, height=540)
 
 with tab_why, U.card("why"):

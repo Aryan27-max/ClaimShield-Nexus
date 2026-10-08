@@ -16,7 +16,7 @@ tiles = [("Blocks", len(lg)), ("Human decisions", int((lg.event_type == "human_d
          ("Model params", m.get("model_params_hash", "-")[:10])]
 for col, (label, value) in zip(st.columns(len(tiles)), tiles):
     with col:
-        U.metric_tile(label, value)
+        U.metric_tile(label, value, small=isinstance(value, str))
 st.write("")
 
 if st.button("Verify chain", key="verify"):

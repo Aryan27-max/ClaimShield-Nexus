@@ -13,8 +13,7 @@ n_over = int((q.status == "over_capacity").sum())
 U.page_header("SIU Queue", f"{C.investigators()} investigators · {cap:.0f} h this week · "
                            f"{q.attrs.get('horizon')}-day horizon · policy {C.policy()['_hash'][:10]}")
 
-tiles = [("Claims flagged", f"{f.get('claims_flagged', 0):,}", "raw rule / lens hits", None),
-         ("Alerts", f.get("alerts", 0), "rules · anomaly · graph", None),
+tiles = [("Alerts", f.get("alerts", 0), "rules · anomaly · graph", None),
          ("Cases", len(q), f"{int((q.status != 'not_queued').sum())} need investigator time", None),
          ("In capacity", int((q.status == "in_capacity").sum()), f"{used:.0f} of {cap:.0f} h", "green"),
          ("Over capacity", n_over, "must-take · escalate", "red" if n_over else None),
@@ -34,33 +33,34 @@ with U.card("queue"):
         U.html_line(*(U.action_badge(a) for a in U.ACTION_COLORS))
     show_all = top[1].toggle("Include monitor / needs-more-data cases", value=False)
     view = q if show_all else q[q.status != "not_queued"]
-    table = view.assign(providers=view.providers.map(lambda p: ", ".join(p)),
-                        recommended_action=view.recommended_action)[
-        ["rank", "case_id", "providers", "recommended_action", "p_fwa", "confidence", "classes", "dollars_at_risk",
-         "members_affected", "est_hours", "status"]]
+    table = view.assign(recommended_action=view.recommended_action.map(U.action_label),
+                        status=view.status.str.replace("_", " "))[
+        ["rank", "case_id", "recommended_action", "p_fwa", "confidence", "classes", "dollars_at_risk", "est_hours",
+         "status"]]
     event = st.dataframe(
         U.table_style(table, "recommended_action", "status"), hide_index=True, width="stretch", height=520,
         on_select="rerun", selection_mode="single-row",
         column_config={
-            "rank": st.column_config.NumberColumn("#", width="small"),
-            "case_id": "Case", "providers": "Providers", "recommended_action": "Recommended",
-            "p_fwa": st.column_config.ProgressColumn("P(escalation)", min_value=0, max_value=1, format="%.2f"),
-            "confidence": st.column_config.NumberColumn("Evidence conf.", format="%.2f"),
-            "classes": st.column_config.ListColumn("Evidence classes"),
-            "dollars_at_risk": st.column_config.NumberColumn("$ at risk", format="dollar"),
-            "members_affected": st.column_config.NumberColumn("Members"),
-            "est_hours": st.column_config.NumberColumn("Est. h", format="%.0f"),
-            "status": "Status",
+            "rank": st.column_config.NumberColumn("#", width=36),
+            "case_id": st.column_config.TextColumn("Case", width=100),
+            "recommended_action": st.column_config.TextColumn("Recommended", width=140),
+            "p_fwa": st.column_config.ProgressColumn("P(escalation)", min_value=0, max_value=1, format="%.2f", width=100),
+            "confidence": st.column_config.NumberColumn("Confidence", format="%.2f", width=80,
+                                                        help="Evidence confidence = fused score × data completeness"),
+            "classes": st.column_config.ListColumn("Evidence classes", width=180),
+            "dollars_at_risk": st.column_config.NumberColumn("$ at risk", format="dollar", width=105),
+            "est_hours": st.column_config.NumberColumn("Est. h", format="%.0f", width=50),
+            "status": st.column_config.TextColumn("Status", width=95),
         })
     rows = event.selection.rows if event and hasattr(event, "selection") else []
     if rows:
         st.session_state["case_id"] = table.iloc[rows[0]].case_id
-        st.switch_page("pages/3_Case.py")
+        st.switch_page("views/3_Case.py")
     c1, c2 = st.columns([4, 1])
     pick = c1.selectbox("Open case", view.case_id.tolist(), label_visibility="collapsed")
     if c2.button("Open case", width="stretch"):
         st.session_state["case_id"] = pick
-        st.switch_page("pages/3_Case.py")
+        st.switch_page("views/3_Case.py")
 
 st.caption("priority = P(escalation, horizon) × $ at risk × severity weight × member-harm weight ÷ est. hours. "
            "Must-take cases (MFCU or severity 5) fill capacity first. " + C.FOOTER)

@@ -127,9 +127,16 @@ def ego_html(entity_id: str, highlight: list[str], max_nodes: int = 150) -> tupl
         hot = n in highlight
         net.add_node(n, label=n if kind != "member" else "", title=f"{kind} {n} {d.get('type', '')}",
                      color=U.NODE_COLORS["highlight"] if hot else U.NODE_COLORS.get(kind, U.GRAY), size=22 if hot else (8 if kind == "member" else 14))
+    hl = set(highlight)
     for u, v, d in sub.edges(data=True):
-        net.add_edge(u, v, title=d.get("rel", ""), color=U.EDGE_COLORS.get(d.get("rel"), U.EDGE_COLORS["default"]),
-                     width=2 if d.get("rel") == "refers" else 1)
+        rel, inner, touches = d.get("rel", ""), u in hl and v in hl, u in hl or v in hl
+        if rel == "refers":
+            color, width = (U.EDGE_COLORS["refers"], 3) if inner else (U.EDGE_COLORS["refers_other"], 1)
+        elif rel in ("owner", "address", "bank") and touches:
+            color, width = U.EDGE_COLORS[rel], 2
+        else:
+            color, width = U.EDGE_COLORS["default"], 1
+        net.add_edge(u, v, title=rel, color=color, width=width)
     net.set_options(PYVIS_OPTIONS)
     html = net.generate_html().replace("network = new vis.Network(container, data, options);",
                                        "network = new vis.Network(container, data, options);" + FREEZE_JS)

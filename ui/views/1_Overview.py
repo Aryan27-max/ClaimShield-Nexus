@@ -20,7 +20,7 @@ U.page_header("Overview", f"Synthetic Medicaid program · data through {m.get('a
 
 steps = [("Claims", n_claims, "all claim lines"), ("Flagged claims", f.get("claims_flagged", 0), "rule / lens hits"),
          ("Alerts", f.get("alerts", 0), "entity-level"), ("Cases", len(q), "provider or ring"),
-         ("Need investigator time", n_queued, "excl. monitor / needs data"), ("This week's slate", n_slate, "in capacity")]
+         ("Need SIU time", n_queued, "excl. monitor / needs data"), ("This week's slate", n_slate, "in capacity")]
 for col, (label, value, delta) in zip(st.columns(len(steps)), steps):
     with col:
         U.metric_tile(label, f"{value:,}", delta, "green" if label == "This week's slate" else None)
@@ -33,18 +33,19 @@ with a, U.card("funnel"):
                f"investigator, and {n_slate} fit this week's capacity. Log scale.")
     fig = go.Figure(go.Bar(y=[s[0] for s in steps][::-1], x=[s[1] for s in steps][::-1], orientation="h",
                            marker_color=[U.GREEN] + [U.ACCENT] * (len(steps) - 1),
-                           text=[f"{s[1]:,}" for s in steps][::-1], textposition="outside"))
+                           text=[f"{s[1]:,}" for s in steps][::-1], textposition="outside", cliponaxis=False))
     fig.update_layout(template=U.plotly_template(), height=320, xaxis=dict(type="log", showticklabels=False),
-                      yaxis=dict(showgrid=False))
-    st.plotly_chart(fig, width="stretch")
+                      yaxis=dict(showgrid=False), margin=dict(l=8, r=64, t=8, b=8))
+    U.plot(fig)
 with b, U.card("dollars"):
     st.subheader("$ at risk by recommended action")
     d = q.groupby("recommended_action").dollars_at_risk.sum().reindex(list(U.ACTION_COLORS)[::-1]).dropna()
-    fig = go.Figure(go.Bar(x=[x.replace("_", " ").title() for x in d.index], y=d.values,
-                           marker_color=[U.ACTION_COLORS[x] for x in d.index],
+    fig = go.Figure(go.Bar(y=[U.action_label(x) for x in d.index], x=d.values, orientation="h",
+                           marker_color=[U.ACTION_COLORS[x] for x in d.index], cliponaxis=False,
                            text=[f"${v / 1e3:,.0f}k" for v in d.values], textposition="outside"))
-    fig.update_layout(template=U.plotly_template(), height=250, yaxis=dict(title="$", showticklabels=False))
-    st.plotly_chart(fig, width="stretch")
+    fig.update_layout(template=U.plotly_template(), height=250, xaxis=dict(showticklabels=False, showgrid=False),
+                      yaxis=dict(showgrid=False), margin=dict(l=8, r=56, t=8, b=8))
+    U.plot(fig)
     U.metric_tile("Weeks to clear the queue", q.attrs.get("weeks_to_clear"),
                   f"{q.attrs.get('queued_hours', 0):.0f} queued h ÷ {q.attrs.get('capacity_hours', 0):.0f} h/week")
 
@@ -64,7 +65,7 @@ else:
         fig = go.Figure([go.Bar(x=rc.scheme, y=rc.any_case, name="Any case", marker_color=U.ACCENT_SOFT),
                          go.Bar(x=rc.scheme, y=rc.prepay_plus, name="Prepay review or higher", marker_color=U.ACCENT)])
         fig.update_layout(template=U.plotly_template(), barmode="group", height=320, yaxis=dict(tickformat=".0%"))
-        st.plotly_chart(fig, width="stretch")
+        U.plot(fig)
     with c2, U.card("legit"):
         st.subheader("Legitimate outliers")
         st.caption("High-cost oncology, busy ERs and honest one-off billing slips: none may reach FULL or MFCU.")
@@ -84,7 +85,7 @@ with c3, U.card("fairness"):
     fig.add_hline(y=fr.attrs["overall"], line_dash="dot", line_color=U.GRAY,
                   annotation_text=f"overall {fr.attrs['overall']:.1%}")
     fig.update_layout(template=U.plotly_template(), barmode="group", height=300, yaxis=dict(tickformat=".0%"))
-    st.plotly_chart(fig, width="stretch")
+    U.plot(fig)
     with st.expander("By specialty"):
         st.dataframe(M.flag_rates(q, "specialty", lab), hide_index=True, width="stretch")
     st.caption("Peer groups are specialty + type, so a specialty is never compared with another. Higher rates "
