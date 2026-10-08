@@ -112,22 +112,22 @@ Pipeline (seconds):
 
 | stage | seconds |
 |---|---|
-| load | 0.02 |
-| rules | 0.29 |
-| anomaly | 3.38 |
-| graph | 1.22 |
-| snapshots | 6.36 |
-| predict | 2.07 |
-| fusion_harness | 0.47 |
-| total | 13.82 |
+| load | 0.01 |
+| rules | 0.16 |
+| anomaly | 2.06 |
+| graph | 0.74 |
+| snapshots | 3.64 |
+| predict | 1.44 |
+| fusion_harness | 0.26 |
+| total | 8.33 |
 
 UI page loads (AppTest, headless):
 
 | page | cold s | warm s |
 |---|---|---|
-| 1_Overview | 2.05 | 0.18 |
-| 2_Queue | 0.25 | 0.21 |
-| 3_Case | 0.22 | 0.22 |
-| 4_Network | 0.8 | 0.47 |
-| 5_Policy | 0.2 | 0.2 |
-| 6_Ledger | 0.19 | 0.19 |
+| 1_Overview | 0.28 | 0.11 |
+| 2_Queue | 0.14 | 0.12 |
+| 3_Case | 0.13 | 0.13 |
+| 4_Network | 0.48 | 0.28 |
+| 5_Policy | 0.12 | 0.11 |
+| 6_Ledger | 0.11 | 0.11 |
