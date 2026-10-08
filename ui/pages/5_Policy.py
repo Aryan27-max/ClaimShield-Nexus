@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from core import harness
+from core import policy_edit as PE
 from eval import metrics as M
 from ui import common as C
 from ui import style as U
@@ -25,29 +26,36 @@ for col, (label, value, delta) in zip(st.columns(len(tiles)), tiles):
         U.metric_tile(label, value, delta)
 st.write("")
 
-values = {}
+values, avail = {}, PE.available_thresholds(pol)
 with U.card("thresholds"):
     st.subheader("Key thresholds")
     cols = st.columns(3)
-    for i, (path, label) in enumerate(harness.THRESHOLDS.items()):
-        v = harness.get_threshold(pol, path)
+    for i, (path, label) in enumerate(avail.items()):
+        v, key = PE.get_threshold(pol, path), f"th_{path}_{pol['_hash'][:8]}"
         with cols[i % 3]:
             if isinstance(v, float) and v <= 1:
-                values[path] = st.slider(label, 0.0, 1.0, float(v), 0.01, key=f"th_{path}_{pol['_hash'][:8]}")
+                values[path] = st.slider(label, 0.0, 1.0, float(v), 0.01, key=key)
+            elif path.startswith("capacity."):
+                values[path] = st.number_input(label, min_value=1, max_value=168, value=int(v), step=1, key=key)
             else:
-                values[path] = st.number_input(label, value=int(v), step=1000 if v > 1000 else 1,
-                                               key=f"th_{path}_{pol['_hash'][:8]}")
-    changed = {k: v for k, v in values.items() if v != harness.get_threshold(pol, k)}
-    st.caption("Changed: " + (", ".join(f"{harness.THRESHOLDS[k]} {harness.get_threshold(pol, k)} → {v}"
+                values[path] = st.number_input(label, min_value=0, value=int(v), step=1000 if v > 1000 else 1, key=key)
+    if missing := [label for path, label in PE.THRESHOLDS.items() if path not in avail]:
+        st.caption("Not in this policy version: " + ", ".join(missing))
+    changed = {k: v for k, v in values.items() if v != PE.get_threshold(pol, k)}
+    st.caption("Changed: " + (", ".join(f"{PE.THRESHOLDS[k]} {PE.get_threshold(pol, k)} → {v}"
                                         for k, v in changed.items()) or "nothing yet"))
-new = harness.with_thresholds(pol, changed)
+try:
+    new = PE.with_thresholds(pol, changed)
+except ValueError as e:
+    new, changed = None, {}
+    st.error(f"These values are not a valid policy: {e}")
 
 st.write("")
 if st.button("Preview impact", key="preview", disabled=not changed):
     st.session_state["preview_of"] = changed
 if st.session_state.get("preview_of") == changed and changed:
     after = harness.evaluate_all(cases.drop(columns=harness.OUTPUT_COLS), new)
-    d = harness.diff(cases, pol, new)
+    d = PE.diff(cases, pol, new)
     counts = pd.DataFrame({"before": cases.recommended_action.value_counts(),
                            "after": after.recommended_action.value_counts()}).reindex(harness.ACTIONS[::-1]).fillna(0).astype(int)
     counts["change"] = counts.after - counts.before
@@ -91,12 +99,12 @@ with U.card("save"):
         save = st.form_submit_button("Save as new version", disabled=not changed)
     if save:
         try:
-            out = harness.save_version(new, author, reason, old=pol)
+            out = PE.save_version(new, author, reason, old=pol)
             st.session_state["pending_policy"] = out["path"]
             st.session_state["policy_saved"] = (f"Saved v{out['version']} · {out['hash'][:10]} → ledger block "
                                                 f"#{out['ledger_idx']}. Queue now ranks under this version.")
             st.session_state.pop("preview_of", None)
             st.rerun()
-        except ValueError as e:
-            st.error(str(e))
+        except (ValueError, OSError) as e:
+            st.error(f"Not saved: {e}")
 st.caption(C.FOOTER)

@@ -5,7 +5,7 @@ import time
 
 import pandas as pd
 
-from core import harness
+from core import harness, policy_edit
 from core import queue as Q
 from core import schema as S
 from eval import metrics as M
@@ -55,7 +55,7 @@ def build() -> str:
     rc = M.recall(cases, labels).rename(columns={"prepay_plus": "PREPAY+ recall", "any_case": "any-case recall",
                                                  "prepay_plus_n": "PREPAY+ entities"})
     mb = M.model_vs_baseline()
-    after = harness.evaluate_all(cases.drop(columns=harness.OUTPUT_COLS), harness.with_thresholds(pol, M.DEMO_THRESHOLDS))
+    after = harness.evaluate_all(cases.drop(columns=harness.OUTPUT_COLS), policy_edit.with_thresholds(pol, M.DEMO_THRESHOLDS))
     vb, va = M.validation(cases, labels), M.validation(after, labels)
     demo = pd.DataFrame({"metric": list(vb), "before": list(vb.values()), "after": list(va.values())})
     actions = cases.recommended_action.value_counts().reindex(harness.ACTIONS[::-1]).fillna(0).astype(int)

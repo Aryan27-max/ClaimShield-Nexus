@@ -122,3 +122,18 @@ def test_ledger_ui_tamper_then_verify_shows_broken_block(tmp_ledger):
     at.run()
     assert not at.exception
     assert any("broken at block 1" in m.value for m in at.markdown)
+
+
+def test_policy_page_shows_validation_error_not_traceback(tmp_ledger, monkeypatch):
+    from core import policy_edit as PE
+
+    def reject(policy, values):
+        if values:
+            raise ValueError("invalid policy: abstain.statistical_min = 0.3 must be ...")
+        return policy
+    monkeypatch.setattr(PE, "with_thresholds", reject)
+    at = _app("pages/5_Policy.py")
+    next(s for s in at.slider if s.key.startswith("th_abstain.statistical_min_")).set_value(0.3)
+    at.run()
+    assert not at.exception and any("not a valid policy" in e.value for e in at.error)
+    assert at.button(key="preview").disabled

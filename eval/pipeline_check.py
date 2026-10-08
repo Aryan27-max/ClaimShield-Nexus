@@ -4,7 +4,7 @@ import sys
 
 import pandas as pd
 
-from core import harness, pipeline
+from core import harness, pipeline, policy_edit
 from core import queue as Q
 from core import schema as S
 from eval.metrics import DEMO_THRESHOLDS, HIGH, action_matrix, provider_actions, validation
@@ -50,7 +50,7 @@ def main() -> int:
     mat, m = action_matrix(cases)
     print(mat.to_string())
     before, after = validation(cases), validation(harness.evaluate_all(
-        cases.drop(columns=harness.OUTPUT_COLS), harness.with_thresholds(policy, DEMO_THRESHOLDS)))
+        cases.drop(columns=harness.OUTPUT_COLS), policy_edit.with_thresholds(policy, DEMO_THRESHOLDS)))
     print(f"policy demo {DEMO_THRESHOLDS}: upcoding PREPAY+ {before['upcoding_prepay_plus']} -> "
           f"{after['upcoding_prepay_plus']}, clean escalated {before['clean_escalated']} -> {after['clean_escalated']}")
     res = checks(cases, mat, m, policy, meta["timings"]["total"])

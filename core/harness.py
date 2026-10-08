@@ -1,6 +1,5 @@
 """Decision harness: human-authored policy YAML -> allowed / recommended actions with a rule trace.
 decide() is the only writer of final actions (human user_id + reason_code, ledgered)."""
-import copy
 import hashlib
 import sqlite3
 from contextlib import closing
@@ -26,11 +25,75 @@ DECISIONS_DDL = """CREATE TABLE IF NOT EXISTS decisions (
 
 
 def load_policy(path: Path | str | None = None) -> dict:
-    """Parsed policy plus `_hash` (sha256 of the YAML bytes) and `_path`."""
+    """Validated policy plus `_hash` (sha256 of the YAML bytes) and `_path`."""
     p = Path(path or S.POLICY)
     raw = p.read_bytes()
-    pol = yaml.safe_load(raw)
+    pol = validate_policy(yaml.safe_load(raw) or {})
     pol["_hash"], pol["_path"] = hashlib.sha256(raw).hexdigest(), str(p)
+    return pol
+
+
+REQUIRED = ["version", "class_map", "class_weights", "completeness", "abstain", "actions", "severity_weights",
+            "member_harm", "est_hours", "capacity", "reason_codes"]
+CONDITIONS = {"min_classes", "min_conf", "min_dollars", "max_dollars", "min_severity", "max_severity", "classes_any",
+              "classes_all", "codes_any", "min_class_score", "predictive_lift", "any_of", "requires_human"}
+
+
+def _num(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def validate_policy(pol: dict) -> dict:
+    """Raises ValueError listing every problem: missing keys, probabilities outside [0, 1], negative $ or hours."""
+    errs = [f"missing key '{k}'" for k in REQUIRED if k not in pol]
+    if errs:
+        raise ValueError("invalid policy: " + "; ".join(errs))
+
+    def check(path: str, v, lo: float, hi: float, integer: bool = False) -> None:
+        if not _num(v) or not lo <= v <= hi or (integer and v != int(v)):
+            errs.append(f"{path} = {v!r} must be {'an integer' if integer else 'a number'} in [{lo:g}, {hi:g}]")
+
+    def cond(path: str, c: dict) -> None:
+        for k, v in (c or {}).items():
+            p = f"{path}.{k}"
+            if k not in CONDITIONS:
+                errs.append(f"{p}: unknown condition")
+            elif k == "any_of":
+                for i, sub in enumerate(v):
+                    cond(f"{p}.{i}", sub)
+            elif k == "min_conf":
+                check(p, v, 0, 1)
+            elif k == "min_class_score":
+                for c_, x in v.items():
+                    check(f"{p}.{c_}", x, 0, 1)
+            elif k in ("min_dollars", "max_dollars"):
+                check(p, v, 0, float("inf"))
+            elif k in ("min_severity", "max_severity"):
+                check(p, v, 1, 5, integer=True)
+            elif k == "min_classes":
+                check(p, v, 1, len(EVIDENCE_CLASSES), integer=True)
+
+    for c, w in pol["class_weights"].items():
+        check(f"class_weights.{c}", w, 0, 1)
+    for k in ("statistical_min", "min_completeness"):
+        check(f"abstain.{k}", pol["abstain"].get(k), 0, 1)
+    for k in ("lift_min", "statistical_min") if "predictive" in pol else ():
+        check(f"predictive.{k}", pol["predictive"].get(k), 0, 1)
+    for a in ACTIONS:
+        if a not in pol["actions"]:
+            errs.append(f"actions.{a} missing")
+        check(f"est_hours.{a}", pol["est_hours"].get(a), 0, 168)
+    check("est_hours.per_extra_provider", pol["est_hours"].get("per_extra_provider"), 0, 168)
+    for a, c in pol["actions"].items():
+        cond(f"actions.{a}", c)
+    check("capacity.investigators", pol["capacity"].get("investigators"), 1, 1000, integer=True)
+    check("capacity.hours_per_investigator_week", pol["capacity"].get("hours_per_investigator_week"), 1, 168)
+    bad = set(pol.get("must_take", {}).get("actions", [])) - set(ACTIONS)
+    errs += [f"must_take.actions: unknown action {a}" for a in sorted(bad)]
+    if not pol["reason_codes"]:
+        errs.append("reason_codes must not be empty")
+    if errs:
+        raise ValueError("invalid policy: " + "; ".join(errs))
     return pol
 
 
@@ -178,70 +241,3 @@ def decide(case_id: str, action: str, user_id: str, reason_code: str, note: str 
 def decisions(db=None) -> pd.DataFrame:
     with closing(_db(db)) as con:
         return pd.read_sql("SELECT * FROM decisions ORDER BY decision_id", con)
-
-
-THRESHOLDS = {  # dotted policy path -> label shown on the Policy page
-    "abstain.statistical_min": "Abstain: statistical-only fused score below",
-    "actions.PREPAY_REVIEW.any_of.1.min_class_score.statistical": "E/M upcoding path: statistical score floor",
-    "actions.PREPAY_REVIEW.any_of.1.min_conf": "E/M upcoding path: min confidence",
-    "predictive.lift_min": "Predictive lift: p_fwa(90) at least",
-    "predictive.statistical_min": "Predictive lift: statistical score floor",
-    "actions.FULL_INVESTIGATION.min_conf": "FULL_INVESTIGATION: min confidence",
-    "actions.REFER_TO_MFCU.min_conf": "REFER_TO_MFCU: min confidence",
-    "actions.REFER_TO_MFCU.min_dollars": "REFER_TO_MFCU: min $ at risk",
-    "capacity.hours_per_investigator_week": "Hours per investigator per week",
-}
-
-
-def _walk(d, path: str):
-    *head, last = path.split(".")
-    for k in head:
-        d = d[int(k)] if isinstance(d, list) else d[k]
-    return d, (int(last) if isinstance(d, list) else last)
-
-
-def get_threshold(policy: dict, path: str):
-    d, k = _walk(policy, path)
-    return d[k]
-
-
-def with_thresholds(policy: dict, values: dict) -> dict:
-    """Unsaved copy of the policy with dotted-path thresholds replaced; `_hash` is provisional (preview only)."""
-    pol = copy.deepcopy({k: v for k, v in policy.items() if not k.startswith("_")})
-    for path, v in values.items():
-        d, k = _walk(pol, path)
-        d[k] = v
-    pol["_hash"] = hashlib.sha256(yaml.safe_dump(pol, sort_keys=True).encode()).hexdigest()
-    pol["_path"] = "(unsaved preview)"
-    return pol
-
-
-def diff(cases: pd.DataFrame, old: dict, new: dict) -> pd.DataFrame:
-    """Cases whose recommended action changes between two policies, with the first new rule-trace line as `why`."""
-    base = cases.drop(columns=OUTPUT_COLS, errors="ignore")
-    a, b = evaluate_all(base, old), evaluate_all(base, new)
-    ch = a.recommended_action != b.recommended_action
-    why = [next((t for t in nt if t not in set(ot)), nt[0] if len(nt) else "")
-           for ot, nt in zip(a.rule_trace[ch], b.rule_trace[ch])]
-    return pd.DataFrame({"case_id": a.case_id[ch], "before": a.recommended_action[ch],
-                         "after": b.recommended_action[ch], "why": why})
-
-
-def save_version(policy: dict, author: str, reason: str, old: dict, folder: Path | str | None = None, db=None) -> dict:
-    """Writes policy/harness_vN.yaml (N = next free version; never overwrites) and a `policy_change` ledger block."""
-    if not str(author).strip() or not str(reason).strip():
-        raise ValueError("author and change reason are required")
-    folder = Path(folder or Path(S.POLICY).parent)
-    n = 1 + max(int(p.stem.rsplit("v", 1)[-1]) for p in folder.glob("harness_v*.yaml"))
-    path = folder / f"harness_v{n}.yaml"
-    body = {**{k: v for k, v in policy.items() if not k.startswith("_")}, "version": n, "name": f"harness_v{n}",
-            "author": author, "created": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "change_reason": reason,
-            "parent_hash": old["_hash"]}
-    with open(path, "x") as f:
-        f.write("# Human-authored decision policy. Models propose; this policy constrains; a human decides.\n")
-        yaml.safe_dump(body, f, sort_keys=False, allow_unicode=True)
-    new = load_policy(path)
-    entry = ledger.append(f"human:{author}", "policy_change", {
-        "old_version": old["version"], "old_hash": old["_hash"], "new_version": n, "new_hash": new["_hash"],
-        "path": path.name, "author": author, "reason": reason}, db)
-    return {"path": str(path), "hash": new["_hash"], "version": n, "ledger_idx": entry["idx"]}
