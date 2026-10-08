@@ -15,6 +15,8 @@ ACTIONS = ["MONITOR", "NEEDS_MORE_DATA", "PROVIDER_EDUCATION", "PREPAY_REVIEW", 
 ESCALATING = ACTIONS[:1:-1]  # MFCU -> EDUCATION, checked top-down
 SAFE = ["NEEDS_MORE_DATA", "MONITOR"]
 EVIDENCE_CLASSES = ["deterministic", "structural", "statistical"]
+OUTPUT_COLS = ["allowed_actions", "recommended_action", "rule_trace", "requires_human", "missing_classes",
+               "predictive_driven", "est_hours", "policy_version", "policy_hash"]  # added by evaluate_all
 DECISIONS_DDL = """CREATE TABLE IF NOT EXISTS decisions (
     decision_id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, case_id TEXT NOT NULL, action TEXT NOT NULL,
     recommended_action TEXT, user_id TEXT NOT NULL, reason_code TEXT NOT NULL, note TEXT,

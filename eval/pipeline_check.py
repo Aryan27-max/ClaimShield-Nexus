@@ -64,8 +64,7 @@ def upcoding_at_prepay(cases: pd.DataFrame, policy: dict, **predictive) -> int:
     """Upcoding entities at PREPAY_REVIEW+ when re-evaluated with the given predictive thresholds."""
     pol = copy.deepcopy(policy)
     pol["predictive"].update(predictive)
-    base = cases.drop(columns=["allowed_actions", "recommended_action", "rule_trace", "requires_human",
-                               "missing_classes", "predictive_driven", "est_hours", "policy_version", "policy_hash"])
+    base = cases.drop(columns=harness.OUTPUT_COLS)
     mat, _ = action_matrix(harness.evaluate_all(base, pol))
     return int(mat.loc["upcoding", HIGH].sum())
 

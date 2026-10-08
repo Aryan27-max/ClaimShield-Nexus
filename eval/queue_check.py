@@ -8,13 +8,9 @@ from core import harness
 from core import queue as Q
 from core import schema as S
 
-HARNESS_COLS = ["allowed_actions", "recommended_action", "rule_trace", "requires_human", "missing_classes",
-                "est_hours", "policy_version", "policy_hash"]
-
-
 def main() -> int:
     pol = harness.load_policy()
-    cases = harness.evaluate_all(pd.read_parquet(S.CASES).drop(columns=HARNESS_COLS, errors="ignore"), pol)
+    cases = harness.evaluate_all(pd.read_parquet(S.CASES).drop(columns=harness.OUTPUT_COLS, errors="ignore"), pol)
     ok = True
     for inv in [1, 3, 5]:
         q = Q.rank(cases, pol, investigators=inv)
