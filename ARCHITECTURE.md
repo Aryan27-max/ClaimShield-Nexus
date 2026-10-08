@@ -93,13 +93,13 @@ Time-based split (train on earlier snapshots, test on later) to avoid leakage.
 ```mermaid
 stateDiagram-v2
   [*] --> Scored
-  Scored --> NEEDS_MORE_DATA: conf in abstain band OR 1 lens
+  Scored --> NEEDS_MORE_DATA: only statistical AND score < statistical_min, OR low completeness
   Scored --> MONITOR: low risk
   Scored --> Eligible: policy conditions met
   Eligible --> PROVIDER_EDUCATION
   Eligible --> PREPAY_REVIEW
   Eligible --> FULL_INVESTIGATION
-  Eligible --> REFER_TO_MFCU: >=2 lenses AND $>=threshold
+  Eligible --> REFER_TO_MFCU: >=2 classes AND $>=min AND conf>=min
   PROVIDER_EDUCATION --> HumanDecision
   PREPAY_REVIEW --> HumanDecision
   FULL_INVESTIGATION --> HumanDecision
@@ -108,17 +108,20 @@ stateDiagram-v2
   HumanDecision --> Ledger: action + reason_code + user_id
   Ledger --> [*]
 ```
-Example policy (`policy/harness_v1.yaml`):
+Evidence classes: **deterministic** (rules), **structural** (graph), **statistical** (anomaly), **predictive** (P5; absent until then). Independence = distinct classes, not distinct alerts. Confidence = weighted noisy-OR of per-class max scores × data-completeness factor (no isotonic calibration until the predictive class lands in P5; 60 labels are too few). Abstain only when the case rests on statistical evidence alone below `abstain.statistical_min`, or data completeness is low; a strong single deterministic or structural signal may reach PREPAY_REVIEW / FULL_INVESTIGATION. MFCU always needs ≥ 2 classes + min $ + min confidence + a human.
+
+Example policy (`policy/harness_v1.yaml`, abridged):
 ```yaml
 version: 1
-abstain: {min_conf: 0.35, max_conf: 0.60, min_lenses: 2}
+class_weights: {deterministic: 0.95, structural: 0.85, statistical: 0.55, predictive: 0.7}
+abstain: {statistical_min: 0.75, min_completeness: 0.6}
 actions:
-  REFER_TO_MFCU:   {min_lenses: 3, min_conf: 0.85, min_dollars: 50000, requires_human: true}
-  FULL_INVESTIGATION: {min_lenses: 2, min_conf: 0.70}
-  PREPAY_REVIEW:   {min_conf: 0.60, lenses_any: [rules, predict]}
-  PROVIDER_EDUCATION: {schemes_only: [upcoding, unbundling], max_dollars: 10000}
+  REFER_TO_MFCU:      {min_classes: 2, min_conf: 0.85, min_dollars: 25000, requires_human: true}
+  FULL_INVESTIGATION: {min_conf: 0.75, min_dollars: 5000, any_of: [{min_classes: 2}, {classes_any: [structural], min_severity: 4}, {classes_any: [deterministic], min_severity: 4}]}
+  PREPAY_REVIEW:      {min_conf: 0.55, classes_any: [deterministic, structural]}
+  PROVIDER_EDUCATION: {classes_any: [deterministic, statistical], max_dollars: 5000}
 weights: {severity: {1: 1, 3: 1.5, 5: 3}, member_harm: {bh: 2.0, home_health: 1.8, default: 1.0}}
-capacity: {hours_per_investigator_week: 30}
+capacity: {investigators: 3, hours_per_investigator_week: 30}
 ```
 
 ## 7. Decision sequence
