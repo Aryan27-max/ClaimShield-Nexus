@@ -7,6 +7,7 @@ from core import compliance as CO
 from core import harness
 
 from ui import common as C
+from ui import fmt
 from ui import style as U
 
 q, m = C.ranked(), C.meta()
@@ -27,10 +28,10 @@ tiles = [("Alerts", f.get("alerts", 0), "rules · anomaly · graph", None),
 for col, (label, value, delta, tone) in zip(st.columns(len(tiles)), tiles):
     with col:
         U.metric_tile(label, value, delta, tone)
-st.write("")
+U.gap()
 if n_over:
     U.result_card(False, f"{n_over} must-take case(s) exceed this week's capacity — escalate to SIU lead.")
-    st.write("")
+    U.gap()
 
 with U.card("queue"):
     top = st.columns([3, 2])
@@ -44,7 +45,7 @@ with U.card("queue"):
     table = view.assign(recommended_action=view.recommended_action.map(U.action_label),
                         status=[("pending approval" if c in pending else s.replace("_", " "))
                                 for c, s in zip(view.case_id, view.status)],
-                        next_deadline=view.case_id.map(deadline).fillna(""))[
+                        next_deadline=view.case_id.map(deadline).map(fmt.day).fillna(""))[
         ["rank", "case_id", "recommended_action", "p_fwa", "confidence", "classes", "dollars_at_risk", "status",
          "next_deadline"]]
     event = st.dataframe(
@@ -54,11 +55,13 @@ with U.card("queue"):
             "rank": st.column_config.NumberColumn("#", width=34),
             "case_id": st.column_config.TextColumn("Case", width=92),
             "recommended_action": st.column_config.TextColumn("Recommended", width=118),
-            "p_fwa": st.column_config.ProgressColumn("P(escalation)", min_value=0, max_value=1, format="%.2f", width=90),
-            "confidence": st.column_config.NumberColumn("Confidence", format="%.2f", width=75,
+            "p_fwa": st.column_config.ProgressColumn("P(escalation)", min_value=0, max_value=1, format="percent", width=90,
+                                                     help="Calibrated chance of a strong alert or confirmed case within "
+                                                          "the horizon (a forecast, never evidence)"),
+            "confidence": st.column_config.NumberColumn("Confidence", format="percent", step=0.001, width=75,
                                                         help="Evidence confidence = fused score × data completeness"),
             "classes": st.column_config.ListColumn("Evidence classes", width=178),
-            "dollars_at_risk": st.column_config.NumberColumn("$ at risk", format="dollar", width=100),
+            "dollars_at_risk": st.column_config.NumberColumn("$ at risk", format="dollar", step=1, width=100),
             "status": st.column_config.TextColumn("Status", width=105),
             "next_deadline": st.column_config.TextColumn("Next deadline", width=95,
                                                          help="Earliest open compliance obligation"),
@@ -69,7 +72,7 @@ with U.card("queue"):
         st.switch_page("views/3_Case.py")
     c1, c2 = st.columns([4, 1])
     pick = c1.selectbox("Open case", view.case_id.tolist(), label_visibility="collapsed")
-    if c2.button("Open case", width="stretch"):
+    if c2.button("Open case", type="primary", width="stretch"):
         st.session_state["case_id"] = pick
         st.switch_page("views/3_Case.py")
 

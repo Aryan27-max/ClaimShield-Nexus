@@ -76,7 +76,7 @@ authorised, why, _ = M.policy_status(pol)
 if not authorised:
     U.result_card(False, f"Policy not authorised: {why}. Every decision is blocked until an SIU lead signs this "
                          "version.")
-    st.write("")
+    U.gap()
 if not C.S.CASES.exists():
     st.error("No cases yet. Run `python -m data.gen.synth && python -m core.pipeline` first.")
     st.stop()

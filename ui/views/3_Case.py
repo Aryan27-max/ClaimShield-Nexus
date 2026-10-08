@@ -6,6 +6,7 @@ import streamlit as st
 from core import brief, harness, identity, phi
 from core import mandate as M
 from ui import common as C
+from ui import fmt
 from ui import export as E
 from ui import panels as P
 from ui import style as U
@@ -27,17 +28,18 @@ who = f"Ring of {r.n_providers} providers" if r.case_type == "ring" else "Provid
 U.page_header(f"Case {case_id}", f"{who} {', '.join(r.providers)} · {', '.join(r.provider_types)} · "
                                  f"rank #{r['rank']} · {r.status.replace('_', ' ')}")
 U.html_line(U.action_badge(r.recommended_action), "&nbsp;", U.class_chips(r.classes))
-st.write("")
-tiles = [("Evidence confidence", f"{r.confidence:.2f}", f"fused {r.fused_score:.2f} × completeness {r.completeness:.2f}"),
+U.gap()
+tiles = [("Evidence confidence", fmt.pct(r.confidence), f"fused {fmt.pct(r.fused_score)} × completeness "
+                                                        f"{fmt.pct(r.completeness)}"),
          (f"P(escalation, {q.attrs.get('horizon')} d)", f"{r.p_fwa:.0%}", "calibrated model" if r.has_model_score
           else "no model score"),
-         ("$ at risk", f"${r.dollars_at_risk:,.0f}", f"{r.n_flagged_claims:,} flagged claims"),
+         ("$ at risk", fmt.money(r.dollars_at_risk), f"{r.n_flagged_claims:,} flagged claims"),
          ("Members affected", f"{r.members_affected:,}", f"{r.vulnerable_share:.0%} under 18 or 65+"),
          ("Est. hours", f"{r.est_hours:.0f}", "must-take" if r.must_take else "")]
 for col, (label, value, delta) in zip(st.columns(len(tiles)), tiles):
     with col:
         U.metric_tile(label, value, delta)
-st.write("")
+U.gap()
 if r.recommended_action == "NEEDS_MORE_DATA":
     st.warning("Needs more data — missing evidence class(es): **" + ", ".join(r.missing_classes) +
                "**. Gather corroborating evidence before any escalation.")
@@ -61,7 +63,7 @@ with tab_ev, U.card("evidence"):
                                    ("Structural $ (flagged claims)", r.dollars_structural),
                                    ("Statistical $ (excess vs peers)", r.dollars_statistical)]):
         with col:
-            U.metric_tile(label, f"${v:,.0f}")
+            U.metric_tile(label, fmt.money(v))
     st.caption(f"{len(r.alert_ids)} alerts ({', '.join(r.codes)}). $ at risk = paid on the union of claim-level "
                "flags; statistical excess only counts when no claim-level evidence exists.")
 
@@ -119,7 +121,7 @@ with tab_brief, U.card("brief"):
     key = f"brief_{case_id}_{r.policy_hash[:12]}"
     st.caption("Deterministic template brief: every sentence is filled from case data. Generating it appends a "
                "`brief_generated` block with the brief's SHA-256 to the ledger.")
-    if st.button("Generate brief", key="gen_brief"):
+    if st.button("Generate brief", key="gen_brief", type="primary"):
         actor = f"human:{st.session_state['user_id']}" if st.session_state.get("user_id") else "system:brief"
         try:
             st.session_state[key] = brief.generate({**r.to_dict(), "case_id": case_id}, pol,
@@ -136,7 +138,7 @@ with tab_brief, U.card("brief"):
         a3.caption(f"Ledger block #{b['ledger_idx']} · sha256 {b['sha256'][:16]} · {b['generated_at']}")
         st.markdown(b["markdown"])
 
-st.write("")
+U.gap()
 with U.card("decision"):
     P.show_flash()
     P.authorisation(case_id, pol)
@@ -153,7 +155,7 @@ with U.card("decision"):
         note = a.text_area("Note", key="note", height=68)
         amount = b.number_input("Overpayment amount $ (OVERPAYMENT_IDENTIFIED only)", min_value=0.0, value=0.0,
                                 step=100.0, key="amount")
-        submitted = st.form_submit_button("Sign & submit", disabled=not can_sign)
+        submitted = st.form_submit_button("Sign & submit", type="primary", disabled=not can_sign)
     if not can_sign:
         st.info("Auditors have read-only access and cannot sign decisions.")
     if submitted:

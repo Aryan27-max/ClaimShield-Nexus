@@ -9,6 +9,7 @@ from core import harness, phi
 from core import mandate as M
 from core.policy_schema import regulatory_basis
 from ui import common as C
+from ui import fmt
 from ui import style as U
 
 
@@ -50,7 +51,7 @@ def authorisation(case_id: str, pol: dict) -> None:
     me, role = C.me(), C.my_role()
     if role == "siu_lead" and me != dm["signer"]:
         a, b = st.columns([1, 2])
-        if a.button("Approve (second signature)", key="approve"):
+        if a.button("Approve (second signature)", key="approve", type="primary"):
             try:
                 out = M.approve(int(last.decision_id), me, pol)
                 _flash(f"Executed with second signature by {me} · mandate {out['mandate_hash'][:12]} · "
@@ -59,7 +60,7 @@ def authorisation(case_id: str, pol: dict) -> None:
                 st.error(str(e))
         with b.expander("Revoke this pending decision"):
             reason = st.text_input("Revocation reason", key="revoke_reason")
-            if st.button("Revoke decision", key="revoke"):
+            if st.button("Revoke decision", key="danger_revoke"):
                 try:
                     M.revoke(dm["mandate_hash"], reason, me)
                     _flash(f"Decision revoked by {me}")
@@ -87,8 +88,8 @@ def compliance(case: pd.Series, case_id: str, pol: dict, asof: date | None = Non
         return
     for o in ob.itertuples():
         extra = f" · ${o.amount:,.0f}" if pd.notna(o.amount) else ""
-        done = f" · met {o.met_at} by {o.met_by}" + (f" ({o.determination})" if o.determination else "") if o.status == "MET" else ""
-        U.html_line(U.chip(o.status, U.OBLIGATION_TONES[o.status]), f"**{o.label}** · due {o.due_date}{extra}{done}")
+        done = f" · met {fmt.day(o.met_at)} by {o.met_by}" + (f" ({o.determination})" if o.determination else "") if o.status == "MET" else ""
+        U.html_line(U.chip(o.status, U.OBLIGATION_TONES[o.status]), f"**{o.label}** · due {fmt.day(o.due_date)}{extra}{done}")
         st.caption(o.basis)
     doer = C.my_role() in CO.DOERS
     if not doer:
@@ -102,7 +103,7 @@ def compliance(case: pd.Series, case_id: str, pol: dict, asof: date | None = Non
             cause = st.selectbox("Good-cause reason (if not suspending)", list(CO.GOOD_CAUSE),
                                  format_func=CO.GOOD_CAUSE.get, key="good_cause")
             note = st.text_input("Documentation note (required)", key="susp_note")
-            if st.form_submit_button("Record determination", disabled=not doer):
+            if st.form_submit_button("Record determination", type="primary", disabled=not doer):
                 try:
                     CO.record_suspension(int(susp.obligation_id.iloc[0]), det, C.me(), note, cause, asof=asof)
                     _flash(f"Suspension determination recorded: {det}")

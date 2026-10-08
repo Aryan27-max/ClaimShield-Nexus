@@ -11,21 +11,22 @@ from core import mandate as MD
 from core import policy_edit as PE
 from eval import metrics as M
 from ui import common as C
+from ui import fmt
 from ui import style as U
 
 pol, cases = C.policy(), C.cases()
 U.page_header("Policy", "Models propose, this policy constrains, a human decides. Every version is hashed into the ledger.")
 if msg := st.session_state.pop("policy_saved", None):
     U.result_card(True, msg)
-    st.write("")
+    U.gap()
 
-created = pol.get("created") or datetime.fromtimestamp(Path(pol["_path"]).stat().st_mtime).strftime("%Y-%m-%d")
+created = fmt.day(pol.get("created") or datetime.fromtimestamp(Path(pol["_path"]).stat().st_mtime))
 tiles = [("Active version", f"v{pol['version']}", Path(pol["_path"]).name), ("Policy hash", pol["_hash"][:10], "sha256 of YAML"),
          ("Author", pol.get("author", "—"), pol.get("change_reason", "initial policy")[:40]), ("Created", created, "")]
 for col, (label, value, delta) in zip(st.columns(len(tiles)), tiles):
     with col:
         U.metric_tile(label, value, delta, small=label == "Author")
-st.write("")
+U.gap()
 
 with U.card("authorisation"):
     ok, why, pm = MD.policy_status(pol)
@@ -37,13 +38,13 @@ with U.card("authorisation"):
     if ok and C.my_role() == "siu_lead":
         with st.expander("Revoke this policy version"):
             reason = st.text_input("Revocation reason", key="policy_revoke_reason")
-            if st.button("Revoke policy version", key="policy_revoke"):
+            if st.button("Revoke policy version", key="danger_policy_revoke"):
                 try:
                     MD.revoke(pm["mandate_hash"], reason, C.me())
                     st.rerun()
                 except ValueError as e:
                     st.error(str(e))
-st.write("")
+U.gap()
 
 values, avail = {}, PE.available_thresholds(pol)
 with U.card("thresholds"):
@@ -69,8 +70,8 @@ except ValueError as e:
     new, changed = None, {}
     st.error(f"These values are not a valid policy: {e}")
 
-st.write("")
-if st.button("Preview impact", key="preview", disabled=not changed):
+U.gap()
+if st.button("Preview impact", key="preview", type="primary", disabled=not changed):
     st.session_state["preview_of"] = changed
 if st.session_state.get("preview_of") == changed and changed:
     after = harness.evaluate_all(cases.drop(columns=harness.OUTPUT_COLS), new)
@@ -91,7 +92,7 @@ if st.session_state.get("preview_of") == changed and changed:
     with b, U.card("changes"):
         st.subheader(f"{len(d)} case(s) change action")
         st.dataframe(U.table_style(d, "after"), hide_index=True, width="stretch", height=300)
-    st.write("")
+    U.gap()
     with U.card("validation"):
         if not C.has_ground_truth():
             st.info("No ground truth available: validation deltas need labelled outcomes.")
@@ -109,7 +110,7 @@ if st.session_state.get("preview_of") == changed and changed:
                 with col:
                     U.metric_tile(label, f"{vb[k]} → {va[k]}", f"{delta:+d}", tone)
 
-st.write("")
+U.gap()
 with U.card("save"):
     st.subheader("Save as new version")
     st.caption("Writes policy/harness_vN.yaml (older versions are never overwritten) and appends a policy_change "
@@ -119,7 +120,7 @@ with U.card("save"):
                                           "only an SIU lead can sign a new policy version."))
     with st.form("save_policy", border=False):
         reason = st.text_input("Change reason", key="policy_reason")
-        save = st.form_submit_button("Sign & save as new version", disabled=not (changed and is_lead))
+        save = st.form_submit_button("Sign & save as new version", type="primary", disabled=not (changed and is_lead))
     if save:
         try:
             out = PE.save_version(new, author, reason, old=pol)

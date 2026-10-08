@@ -27,7 +27,7 @@ steps = [("Claims", n_claims, "all claim lines"), ("Flagged claims", f.get("clai
 for col, (label, value, delta) in zip(st.columns(len(steps)), steps):
     with col:
         U.metric_tile(label, f"{value:,}", delta, "green" if label == "This week's slate" else None)
-st.write("")
+U.gap()
 
 a, b = st.columns([3, 2])
 with a, U.card("funnel"):
@@ -52,7 +52,7 @@ with b, U.card("dollars"):
     U.metric_tile("Weeks to clear the queue", q.attrs.get("weeks_to_clear"),
                   f"{q.attrs.get('queued_hours', 0):.0f} queued h ÷ {q.attrs.get('capacity_hours', 0):.0f} h/week")
 
-st.write("")
+U.section("Compliance workflow", "Obligations are created only by executed human decisions, never by model scores.")
 cs = CO.summary(asof=date.today())
 for col, (label, value, delta, tone) in zip(st.columns(3), [
         ("Obligations due in 7 days", cs["due_soon"], "from executed human decisions", "orange" if cs["due_soon"] else None),
@@ -62,10 +62,8 @@ for col, (label, value, delta, tone) in zip(st.columns(3), [
     with col:
         U.metric_tile(label, value, delta, tone)
 
-st.write("")
-st.header("Synthetic validation")
-st.caption("Ground truth exists only because the data is synthetic. Only this evaluation reads it; the detection "
-           "lenses, fusion and harness never do.")
+U.section("Synthetic validation", "Ground truth exists only because the data is synthetic. Only this evaluation "
+          "reads it; the detection lenses, fusion and harness never do.")
 gt = C.has_ground_truth()
 lab = C.labels() if gt else pd.DataFrame(columns=["entity_id", "label"])
 if not gt:
@@ -87,7 +85,7 @@ else:
         U.metric_tile("Clean providers escalated", v["clean_escalated"], "any action needing investigator time",
                       "green" if v["clean_escalated"] == 0 else "red")
 
-st.write("")
+U.gap()
 c3, c4 = st.columns(2)
 with c3, U.card("fairness"):
     st.subheader("Fairness check: flag rate by provider type")

@@ -18,10 +18,10 @@ tiles = [("Blocks", len(lg)), ("Human decisions", int((lg.event_type == "human_d
 for col, (label, value) in zip(st.columns(len(tiles)), tiles):
     with col:
         U.metric_tile(label, value, small=isinstance(value, str))
-st.write("")
+U.gap()
 
 b1, b2, _ = st.columns([1, 1, 2])
-if b1.button("Verify chain", key="verify"):
+if b1.button("Verify chain", key="verify", type="primary"):
     ok, bad = ledger.verify()
     U.result_card(ok, f"✓ Chain intact — {len(lg)} blocks verified." if ok else
                   f"✕ Chain broken at block {bad}. Every later block is untrusted.")
@@ -32,7 +32,7 @@ if b2.button("Verify signatures", key="verify_sigs"):
                   f"✕ Signature invalid at block {int(bad_sig.idx.iloc[0])} ({bad_sig.event_type.iloc[0]}).")
     st.dataframe(sigs.assign(signature_ok=sigs.signature_ok.map({True: "✓", False: "✕"})), hide_index=True,
                  width="stretch")
-    st.write("")
+    U.gap()
 
 with U.card("chain"):
     st.subheader("Latest 50 blocks")
@@ -45,24 +45,24 @@ with U.card("chain"):
 
 d = harness.decisions()
 if len(d):
-    st.write("")
+    U.gap()
     with U.card("decisions"):
         st.subheader("Human decisions")
         st.dataframe(d.iloc[::-1], hide_index=True, width="stretch")
 
-st.write("")
+U.gap()
 with st.expander("Demo controls", expanded=bool(st.session_state.pop("open_reset", False))):
     a, b = st.columns(2)
     with a:
         st.markdown("**Simulate tamper** — edits a block's payload without re-hashing.")
         idx = st.number_input("Block", min_value=0, max_value=max(len(lg) - 1, 0), value=max(len(lg) - 1, 0), step=1)
-        if st.button("Simulate tamper", disabled=not len(lg)):
+        if st.button("Simulate tamper", key="danger_tamper", disabled=not len(lg)):
             ledger.tamper(int(idx))
             st.warning(f"Block {int(idx)} modified. Click Verify chain.")
     with b:
         st.markdown("**Reset demo ledger** — deletes all blocks and decisions, then re-logs a fresh pipeline run.")
         sure = st.checkbox("I understand this deletes the demo ledger")
-        if st.button("Reset demo ledger", disabled=not sure):
+        if st.button("Reset demo ledger", key="danger_reset", disabled=not sure):
             from core import pipeline
             with st.spinner("Resetting and re-running pipeline..."):
                 pipeline.run_all(reset_ledger=True)

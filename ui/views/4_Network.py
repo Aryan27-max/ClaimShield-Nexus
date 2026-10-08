@@ -35,7 +35,7 @@ tiles = [("Community size", int(comms.comm_size.iloc[0]) if one else f"{len(comm
 for col, (label, value, delta) in zip(st.columns(len(tiles)), tiles):
     with col:
         U.metric_tile(label, value, delta)
-st.write("")
+U.gap()
 
 left, right = st.columns([3, 2])
 with left, U.card("ego"):
@@ -54,7 +54,7 @@ with right:
                 outside = int(g.loc[grp.index, n_col].max()) - (len(grp) - 1)
                 st.markdown(f"**{col.removesuffix('_id').capitalize()}** `{v}` · {len(grp)} of these providers"
                             + (f" + {outside} outside" if outside > 0 else ""))
-    st.write("")
+    U.gap()
     with U.card("flows"):
         st.subheader("Referral flows")
         fl = C.referral_flows()
@@ -71,7 +71,7 @@ with right:
                 "share": st.column_config.ProgressColumn("share", min_value=0, max_value=1, width=115),
                 "in case": st.column_config.CheckboxColumn(width=60)})
 
-st.write("")
+U.gap()
 with U.card("rings"):
     st.subheader("All detected rings")
     rr = []
@@ -82,7 +82,7 @@ with U.card("rings"):
                    "action": cs.recommended_action.iloc[0] if len(cs) else "—",
                    "$ at risk": float(cs.dollars_at_risk.iloc[0]) if len(cs) else 0.0})
     st.dataframe(U.table_style(pd.DataFrame(rr), "action"), hide_index=True, width="stretch",
-                 column_config={"$ at risk": st.column_config.NumberColumn(format="dollar")})
+                 column_config={"$ at risk": st.column_config.NumberColumn(format="dollar", step=1)})
     cols = st.columns(len(rings) * 2 or 1)
     for i, rid in enumerate(rings):
         if cols[2 * i].button(f"Show {rid}", key=f"show_{rid}", width="stretch"):

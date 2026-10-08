@@ -32,6 +32,7 @@ TOKENS = {
     "sidebar": ("rgba(255,255,255,.72)", "rgba(28,28,30,.72)"), "refers-other": ("#F6C9C5", "#5C2B28"),
     "shadow1": ("rgba(0,0,0,.04)", "rgba(0,0,0,.6)"), "shadow2": ("rgba(0,0,0,.06)", "rgba(0,0,0,.55)"),
 }
+SPACE = {"xs": 4, "s": 8, "sm": 12, "m": 16, "l": 24, "xl": 32, "xxl": 48}  # px spacing scale
 TONE = {"blue": "accent", "green": "success", "orange": "warning", "red": "danger", "gray": "neutral"}
 TONE_NAMES = list(TONE)
 LOGOS = {"light": "Black_logo.png", "dark": "White_logo.png"}
@@ -94,7 +95,8 @@ def var(name: str) -> str:
 
 
 def css() -> str:
-    tokens = "; ".join(f"--cs-{k}: light-dark({lt}, {dk})" for k, (lt, dk) in TOKENS.items())
+    tokens = "; ".join([f"--cs-{k}: light-dark({lt}, {dk})" for k, (lt, dk) in TOKENS.items()] +
+                       [f"--cs-space-{k}: {px}px" for k, px in SPACE.items()])
     v, sh = var, f"0 1px 2px {var('shadow1')}, 0 4px 16px {var('shadow1')}"
     return f"""
 <style>
@@ -102,10 +104,13 @@ def css() -> str:
 html, body, .stApp, button, input, textarea, select, [data-testid="stMarkdownContainer"] {{
   font-family: {FONT}; -webkit-font-smoothing: antialiased; }}
 .stApp, [data-testid="stMarkdownContainer"] {{ color: {v("text")}; }}
-.block-container {{ padding-top: 2.5rem; padding-bottom: 4rem; max-width: 1280px; }}
+.block-container {{ padding: {v("space-xl")} {v("space-xxl")} {v("space-xxl")}; max-width: 1280px; }}
+.cs-gap {{ height: {v("space-m")}; }}
+div[class*="st-key-btnrow_"] {{ gap: {v("space-sm")} !important; flex-wrap: wrap; }}
 h1 {{ font-size: 40px !important; font-weight: 700 !important; letter-spacing: -0.02em; line-height: 1.1; }}
 h2, h3 {{ font-weight: 600 !important; letter-spacing: -0.015em; }}
-.cs-sub {{ color: {v("text-2")}; font-size: 17px; margin: -0.6rem 0 1.6rem 0; }}
+.cs-sub {{ color: {v("text-2")}; font-size: 17px; margin: -0.6rem 0 {v("space-l")} 0; max-width: 760px; }}
+.cs-sub b {{ color: {v("text")}; font-weight: 600; }}
 .cs-muted, [data-testid="stCaptionContainer"] {{ color: {v("text-2")} !important; }}
 #MainMenu, footer, [data-testid="stToolbar"], [data-testid="stAppDeployButton"], [data-testid="stDecoration"] {{
   display: none !important; }}
@@ -114,7 +119,7 @@ header[data-testid="stHeader"] {{ background: transparent; }}
   backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
   border-right: 1px solid {v("border")}; }}
 [data-testid="stSidebar"] > div {{ background: transparent !important; }}
-div[class*="st-key-card_"] {{ background: {v("surface")}; border-radius: 18px; box-shadow: {sh}; padding: 24px;
+div[class*="st-key-card_"] {{ background: {v("surface")}; border-radius: 18px; box-shadow: {sh}; padding: {v("space-l")};
   transition: box-shadow 150ms ease; }}
 div[class*="st-key-card_"]:hover {{ box-shadow: 0 1px 2px {v("shadow2")}, 0 8px 24px {v("shadow2")}; }}
 .cs-tile {{ background: {v("surface")}; border-radius: 18px; box-shadow: {sh}; padding: 18px 20px; min-height: 152px;
@@ -128,14 +133,19 @@ div[class*="st-key-card_"]:hover {{ box-shadow: 0 1px 2px {v("shadow2")}, 0 8px 
   font-weight: 600; margin: 0 6px 4px 0; letter-spacing: 0; }}
 .cs-badge {{ padding: 4px 12px; font-size: 12.5px; }}
 .cs-result {{ border-radius: 18px; padding: 20px 24px; font-size: 17px; font-weight: 600; box-shadow: {sh}; }}
-.stButton button, .stFormSubmitButton button, .stDownloadButton button {{
-  border-radius: 980px !important; background: {v("button")} !important; color: #fff !important;
-  border: none !important; font-weight: 500; padding: 0.45rem 1.2rem; transition: filter 150ms ease, transform 150ms; }}
-.stButton button:hover, .stFormSubmitButton button:hover {{ filter: brightness(1.08); }}
+.stButton button, .stFormSubmitButton button, .stDownloadButton button {{ min-height: 44px; border-radius: 980px !important;
+  padding: 0 {v("space-l")} !important; font-weight: 600; transition: filter 150ms ease, transform 150ms; }}
+button[data-testid^="stBaseButton-primary"] {{ background: {v("button")} !important; color: #fff !important;
+  border: 1px solid transparent !important; }}
+button[data-testid^="stBaseButton-secondary"] {{ background: {v("surface")} !important; color: {v("accent-text")} !important;
+  border: 1px solid {v("border-strong")} !important; }}
+div[class*="st-key-danger"] button {{ background: {v("danger-button")} !important; color: #fff !important;
+  border: 1px solid transparent !important; }}
+.stButton button p, .stFormSubmitButton button p, .stDownloadButton button p {{ color: inherit !important; }}
+.stButton button:hover, .stFormSubmitButton button:hover, .stDownloadButton button:hover {{ filter: brightness(1.06); }}
 .stButton button:active, .stFormSubmitButton button:active {{ transform: scale(.98); }}
-.stButton button p, .stFormSubmitButton button p, .stDownloadButton button p {{ color: #fff !important; }}
-.stButton button:disabled, .stFormSubmitButton button:disabled {{ background: {v("neutral-bg")} !important; }}
-.stButton button:disabled p, .stFormSubmitButton button:disabled p {{ color: {v("text-2")} !important; }}
+.stButton button:disabled, .stFormSubmitButton button:disabled {{ background: {v("neutral-bg")} !important;
+  color: {v("text-2")} !important; border: 1px dashed {v("border")} !important; cursor: not-allowed; filter: none; }}
 .st-key-verify button, .st-key-verify_sigs button {{ font-size: 19px !important; padding: 0.8rem 2.6rem !important;
   min-height: 3.2rem; }}
 button:focus-visible, a:focus-visible, [role="tab"]:focus-visible, input:focus-visible, [tabindex]:focus-visible {{
@@ -184,10 +194,31 @@ def logo_css(root) -> str:
                                f"{_logo_uri(str(root / 'public' / f))}); }} }}" for m, f in LOGOS.items()) + "</style>"
 
 
-def page_header(title: str, subtitle: str = "") -> None:
-    st.title(title)
-    if subtitle:
-        st.markdown(f'<div class="cs-sub">{html.escape(subtitle)}</div>', unsafe_allow_html=True)
+def page_header(title: str, subtitle: str = "", actions: bool = False):
+    """Title + one-line "what you can do here" subtitle; with actions=True returns a right-aligned slot for them."""
+    left, right = st.columns([3, 1], vertical_alignment="center") if actions else (st.container(), None)
+    with left:
+        st.title(title)
+        if subtitle:
+            st.markdown(f'<div class="cs-sub">{html.escape(subtitle)}</div>', unsafe_allow_html=True)
+    return right
+
+
+def gap() -> None:
+    """Extra space so that sections sit 32 px apart (16 px element gap + 16 px)."""
+    st.markdown('<div class="cs-gap"></div>', unsafe_allow_html=True)
+
+
+def section(title: str, caption: str = "") -> None:
+    gap()
+    st.header(title)
+    if caption:
+        st.caption(caption)
+
+
+def button_row(key: str):
+    """Flex row for a group of buttons: 12 px apart, wrapping on narrow screens."""
+    return st.container(horizontal=True, gap="small", key=f"btnrow_{key}", vertical_alignment="center")
 
 
 def card(key: str):
