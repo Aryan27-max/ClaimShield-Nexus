@@ -7,6 +7,9 @@ SEED = 42
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "out"
 LEDGER_DB = OUT / "ledger.db"
+CASES = OUT / "cases.parquet"
+RUN_META = OUT / "run_meta.json"
+POLICY = ROOT / "policy" / "harness_v1.yaml"
 
 START = pd.Timestamp("2024-01-01")
 END = pd.Timestamp("2025-06-30")

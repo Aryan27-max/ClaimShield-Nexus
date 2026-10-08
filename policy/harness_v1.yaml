@@ -1,0 +1,77 @@
+# Human-authored decision policy. Models propose; this policy constrains; a human decides.
+version: 1
+name: harness_v1
+author: SIU policy lead
+
+class_map: {rules: deterministic, graph: structural, anomaly: statistical, predict: predictive}
+class_weights: {deterministic: 0.95, structural: 0.9, statistical: 0.7, predictive: 0.7}
+
+completeness:
+  min_active_days: 90
+  short_history_factor: 0.8
+  min_claims: 30
+  sparse_factor: 0.8
+  no_referrals_factor: 0.9
+
+abstain:
+  statistical_min: 0.6     # statistical-only cases below this fused score => NEEDS_MORE_DATA
+  min_completeness: 0.6    # data too thin to act => NEEDS_MORE_DATA
+
+# Checked top-down; recommended = highest action whose conditions all pass.
+# Keys: min_classes, min_conf, min_dollars, max_dollars, min_severity, max_severity,
+#       classes_any, classes_all, codes_any, min_class_score, any_of (list of condition blocks).
+actions:
+  REFER_TO_MFCU:
+    requires_human: true
+    min_classes: 2
+    min_conf: 0.85
+    min_dollars: 25000
+    min_severity: 4
+  FULL_INVESTIGATION:
+    min_conf: 0.7
+    any_of:
+      - {min_classes: 2, min_dollars: 5000}
+      - {classes_any: [structural], min_severity: 4, min_dollars: 5000}
+      - {classes_any: [deterministic], min_severity: 4, min_dollars: 5000}
+      - {classes_any: [deterministic], min_severity: 5}
+  PREPAY_REVIEW:
+    min_conf: 0.55
+    any_of:
+      - {classes_any: [deterministic, structural]}
+      - {codes_any: ["AN:em_hi_share"], min_class_score: {statistical: 0.85}}
+  PROVIDER_EDUCATION:
+    max_dollars: 5000
+    max_severity: 3
+    codes_any: [R01, R02, R03, "AN:em_hi_share", "AN:units_per_claim"]
+  NEEDS_MORE_DATA: {}
+  MONITOR: {}
+
+severity_weights: {1: 1.0, 2: 1.2, 3: 1.5, 4: 2.0, 5: 3.0}
+
+member_harm:
+  vulnerable_bonus: 0.5    # x (1 + bonus * share of members < 18 or >= 65)
+  type_weights: {bh: 2.0, home_health: 1.8, dme: 1.3, ambulance: 1.2, default: 1.0}
+
+est_hours:
+  MONITOR: 0
+  NEEDS_MORE_DATA: 0
+  PROVIDER_EDUCATION: 3
+  PREPAY_REVIEW: 6
+  FULL_INVESTIGATION: 20
+  REFER_TO_MFCU: 30
+  per_extra_provider: 2
+
+capacity:
+  investigators: 3
+  hours_per_investigator_week: 30
+  no_capacity_actions: [MONITOR, NEEDS_MORE_DATA]
+
+reason_codes:
+  EVIDENCE_CORROBORATED: Evidence reviewed and corroborated across sources
+  PATTERN_CONSISTENT_FWA: Billing pattern consistent with fraud, waste or abuse
+  BILLING_ERROR_LIKELY: Likely clerical or billing error; education appropriate
+  LEGITIMATE_CASE_MIX: Outlier explained by legitimate patient mix or service line
+  INSUFFICIENT_EVIDENCE: Evidence insufficient; gather more data
+  HIGH_MEMBER_HARM: Potential harm to vulnerable members warrants priority
+  ALREADY_UNDER_REVIEW: Provider already under review or open case
+  OTHER: Other (explain in note)
