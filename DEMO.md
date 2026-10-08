@@ -22,7 +22,7 @@ Backup answers:
 ## Demo checklist (10 minutes before)
 
 ```bash
-cd ~/dev/claimshield && git status --short          # clean tree
+git status --short                                   # from the repo root: clean tree
 find policy -name 'harness_v*.yaml' ! -name harness_v1.yaml -delete   # drop rehearsal versions
 .venv/bin/python -m data.gen.synth && .venv/bin/python -m core.pipeline --reset-ledger   # re-signs v1 as siu.lead
 .venv/bin/python -m pytest -q                        # all green

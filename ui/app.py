@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st  # noqa: E402
 
+from core import bootstrap as B  # noqa: E402
 from core import identity  # noqa: E402
 from core import mandate as M  # noqa: E402
 from ui import common as C  # noqa: E402
@@ -13,6 +14,11 @@ from ui import style as U  # noqa: E402
 
 st.set_page_config(page_title="ClaimShield Nexus", page_icon=":shield:", layout="wide")
 U.inject_css()
+
+if B.needs_bootstrap():  # hosted cold start / ephemeral disk: rebuild data, models and keys once
+    with st.spinner("Preparing demo data (first load ~20 s)"):
+        B.ensure_demo_data()
+    st.cache_data.clear()
 
 PAGES = [st.Page("views/1_Overview.py", title="Overview", icon=":material/insights:", default=True),
          st.Page("views/2_Queue.py", title="SIU Queue", icon=":material/format_list_numbered:"),

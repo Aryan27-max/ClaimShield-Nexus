@@ -25,3 +25,4 @@ SUMMARY.md
 
 # signing keys (demo identities)
 *.pem
+data/.bootstrap.lock
