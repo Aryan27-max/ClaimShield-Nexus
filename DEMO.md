@@ -14,7 +14,8 @@ Setup: app open on **Overview**, sidebar at 3 investigators, 90-day horizon, pol
 | 3:45–4:00 | — | — | "Machines find evidence. Humans make decisions. The ledger proves it." |
 
 Backup answers:
-- *Why not let the model decide?* The forecast only matches a naive "flagged before" baseline on known offenders. It is useful for new-onset providers, so it ranks the queue but never counts as evidence.
+- *Does the model beat the baseline?* No, not on already-flagged providers: a naive "flagged before" persistence baseline is as good or better, and we show both on Overview. The forecast is an early warning for providers without flag history. We found train/test leakage and fixed it with an embargo; the numbers shown are post-fix. It ranks the queue but never counts as evidence.
+- *What changes on the Policy page?* Only the E/M lever: upcoding at PREPAY+ goes from 1 to 5 with zero clean providers escalated.
 - *Upcoding recall is low?* Peer comparison alone is not enough to accuse anyone. The policy abstains until a human lowers the threshold or records evidence arrives.
 
 ## Demo checklist (10 minutes before)

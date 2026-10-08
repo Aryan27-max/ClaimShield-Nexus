@@ -71,7 +71,8 @@ Full, generated numbers: [docs/RESULTS.md](docs/RESULTS.md). Highlights from the
 - **99.3% alert reduction:** 9,061 flagged claims become 63 cases that need investigator time, and 7 of them fit this week's capacity at 3 investigators.
 - **Recall at PREPAY_REVIEW or higher:** 100% for duplicate billing, unbundling, phantom services, impossible timing, DME rings and kickback referrals; 88% for excessive units; 10% for upcoding (any-case recall 80%).
 - **Zero** clean providers and **zero** legitimate outliers (high-cost oncology, busy ERs, honest billing slips) reach FULL_INVESTIGATION or MFCU.
-- **Forecast vs naive persistence baseline (ROC-AUC, h = 90):** .951 vs .954. On providers with no flag history the model reaches .64–.85 where the baseline is blind (.50), but on few positives.
+- **Forecast = early warning, shown next to a naive baseline.** The predictive lens targets providers **without** flag history (new-onset). On already-flagged providers a naive persistence baseline is as good or better (ROC-AUC at 90 days: model .951, baseline .954), so both are shown. On new-onset providers the model reaches .64–.85 where the baseline is blind (.50), but on few positives. Train/test leakage was found and fixed with an embargo; these are the post-fix numbers.
+- **Policy demo (E/M lever):** a human lowers the E/M-share thresholds on the Policy page. Upcoding at PREPAY+ goes from 1 to 5 with zero clean providers escalated.
 
 ## Responsible AI
 
@@ -84,8 +85,8 @@ Full, generated numbers: [docs/RESULTS.md](docs/RESULTS.md). Highlights from the
 ## Honest limitations
 
 - **Synthetic data only.** Schemes are planted, and rules have near-perfect precision because the base data is clean. Real claims will be noisier. No PHI is handled, so no PHI controls were needed or built.
-- **Predictive vs baseline.** On already-flagged providers a persistence baseline is as good or better (it wins PR-AUC and P@20 on every horizon). The forecast is positioned as an early warning for new-onset providers, and it is never counted as evidence.
-- **Label hindsight.** Forecast labels use whole-run alert scores (not re-scored per snapshot), so labels carry mild hindsight. Train, calibration and test are separated by an embargo.
+- **Predictive vs baseline.** On already-flagged providers a naive persistence baseline is as good or better (it wins PR-AUC and P@20 on every horizon), and we show both. The forecast is positioned as an early warning for providers without flag history (new-onset), and it is never counted as evidence.
+- **Label hindsight.** Forecast labels use whole-run alert scores (not re-scored per snapshot), so labels carry mild hindsight. An earlier version leaked labels from the test period into training; this was found and fixed with an embargo between train, calibration and test (T + h ≤ start of the next split).
 - **Upcoding recall.** Upcoding is visible only to peer comparison, so most upcoders abstain under the default policy. A human can lower the E/M-share thresholds on the Policy page (1 → 5 upcoders at PREPAY+, zero clean providers).
 - **Capacity assumptions.** Estimated hours per action and 30 h per investigator per week are policy assumptions, not measured SIU throughput.
 
@@ -97,10 +98,11 @@ Full, generated numbers: [docs/RESULTS.md](docs/RESULTS.md). Highlights from the
 
 ## Screenshots
 
-| Overview | Queue | Case brief |
-|---|---|---|
-| ![Overview](docs/img/overview.png) | ![Queue](docs/img/queue.png) | ![Case](docs/img/case.png) |
+Screenshots: run `./run.sh` and open http://localhost:8501.
 
-| Network | Policy preview | Ledger verify |
-|---|---|---|
-| ![Network](docs/img/network.png) | ![Policy](docs/img/policy.png) | ![Ledger](docs/img/ledger.png) |
+<!-- ![Overview](docs/img/overview.png) -->
+<!-- ![Queue](docs/img/queue.png) -->
+<!-- ![Case](docs/img/case.png) -->
+<!-- ![Network](docs/img/network.png) -->
+<!-- ![Policy](docs/img/policy.png) -->
+<!-- ![Ledger](docs/img/ledger.png) -->
