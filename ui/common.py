@@ -16,6 +16,9 @@ from core import queue as Q  # noqa: E402
 from core import schema as S  # noqa: E402
 from ui import style as U  # noqa: E402
 
+PYVIS_OPTIONS = ('{"physics": {"enabled": true, "solver": "barnesHut", "stabilization": {"enabled": true, '
+                 '"iterations": 100, "updateInterval": 50, "fit": true}}, "interaction": {"hover": true}}')
+FREEZE_JS = ' network.once("stabilizationIterationsDone", function () { network.setOptions({physics: false}); });'
 FOOTER = "Recommendation only — final action requires a human decision."
 
 
@@ -95,8 +98,10 @@ def ego_html(entity_id: str, highlight: list[str], max_nodes: int = 150) -> tupl
     for u, v, d in sub.edges(data=True):
         net.add_edge(u, v, title=d.get("rel", ""), color=U.EDGE_COLORS.get(d.get("rel"), U.EDGE_COLORS["default"]),
                      width=2 if d.get("rel") == "refers" else 1)
-    net.toggle_physics(True)
-    return net.generate_html(), sub.number_of_nodes()
+    net.set_options(PYVIS_OPTIONS)
+    html = net.generate_html().replace("network = new vis.Network(container, data, options);",
+                                       "network = new vis.Network(container, data, options);" + FREEZE_JS)
+    return html.replace("</head>", U.PYVIS_HIDE_LOADING + "</head>", 1), sub.number_of_nodes()
 
 
 @st.cache_data(show_spinner=False)

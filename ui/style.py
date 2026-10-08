@@ -20,6 +20,7 @@ PALETTE = [ACCENT, ORANGE, GREEN, RED, "#AF52DE", "#5AC8FA", GRAY]
 NODE_COLORS = {"provider": ACCENT, "member": LIGHT_GRAY, "owner": ORANGE, "address": GREEN, "bank": "#AF52DE",
                "highlight": RED}
 EDGE_COLORS = {"refers": RED, "default": HAIRLINE}
+PYVIS_HIDE_LOADING = "<style>#loadingBar { display: none !important; }</style>"
 SHADOW = "0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04)"
 
 CSS = f"""
