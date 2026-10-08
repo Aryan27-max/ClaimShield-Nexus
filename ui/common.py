@@ -11,7 +11,7 @@ import networkx as nx  # noqa: E402
 import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
 
-from core import graph, harness, identity  # noqa: E402
+from core import graph, harness, identity, phi  # noqa: E402
 from core import queue as Q  # noqa: E402
 from core import schema as S  # noqa: E402
 from ui import style as U  # noqa: E402
@@ -134,7 +134,8 @@ def ego_html(entity_id: str, highlight: list[str], max_nodes: int = 150) -> tupl
     for n, d in sub.nodes(data=True):
         kind = d.get("kind", "?")
         hot = n in highlight
-        net.add_node(n, label=n if kind != "member" else "", title=f"{kind} {n} {d.get('type', '')}",
+        net.add_node(n, label=n if kind != "member" else "",
+                     title=f"{kind} {phi.token(n) if kind == 'member' else n} {d.get('type', '')}",
                      color=U.NODE_COLORS["highlight"] if hot else U.NODE_COLORS.get(kind, U.GRAY), size=22 if hot else (8 if kind == "member" else 14))
     hl = set(highlight)
     for u, v, d in sub.edges(data=True):

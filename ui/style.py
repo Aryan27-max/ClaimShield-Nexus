@@ -15,7 +15,11 @@ ACTION_COLORS = {"REFER_TO_MFCU": RED, "FULL_INVESTIGATION": ORANGE, "PREPAY_REV
 ACTION_LABELS = {"REFER_TO_MFCU": "Refer to MFCU", "FULL_INVESTIGATION": "Full investigation",
                  "PREPAY_REVIEW": "Prepay review", "PROVIDER_EDUCATION": "Provider education",
                  "NEEDS_MORE_DATA": "Needs more data", "MONITOR": "Monitor"}
-STATUS_COLORS = {"in_capacity": GREEN, "over_capacity": RED, "deferred": ORANGE, "not_queued": GRAY}
+STATUS_COLORS = {"in_capacity": GREEN, "over_capacity": RED, "deferred": ORANGE, "not_queued": GRAY,
+                 "pending_approval": "#AF52DE"}
+OBLIGATION_TONES = {"OPEN": "blue", "MET": "green", "OVERDUE": "red"}
+STEP_STATES = {"ok": ("green", "✓"), "fail": ("red", "✕"), "pending": ("orange", "pending"), "todo": ("gray", "—"),
+               "na": ("gray", "not required"), "revoked": ("red", "revoked")}
 TONES = {"blue": (ACCENT, "#E8F2FD"), "green": ("#248A3D", "#E9F8EE"), "orange": ("#C93400", "#FFF4E5"),
          "red": ("#D70015", "#FFEBEA"), "gray": (SECONDARY, "#F2F2F7")}
 CLASS_TONES = {"deterministic": "blue", "structural": "orange", "statistical": "gray", "predictive": "green"}
@@ -121,6 +125,15 @@ def action_badge(action: str) -> str:
 
 def class_chips(classes) -> str:
     return "".join(chip(c, CLASS_TONES.get(c, "gray")) for c in classes)
+
+
+def steps(items: list[tuple[str, str]]) -> str:
+    """Authorisation chain as chips joined by arrows, e.g. Policy ✓ → Decision ✓ → Approval pending."""
+    out = []
+    for label, state in items:
+        tone, mark = STEP_STATES.get(state, ("gray", state))
+        out.append(chip(f"{label} {mark}", tone))
+    return f' <span style="color:{SECONDARY}">→</span> '.join(out)
 
 
 def html_line(*parts: str) -> None:

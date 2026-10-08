@@ -1,5 +1,10 @@
 """SIU queue: funnel + capacity tiles and the capacity-ranked case list."""
+from datetime import date
+
 import streamlit as st
+
+from core import compliance as CO
+from core import harness
 
 from ui import common as C
 from ui import style as U
@@ -33,24 +38,30 @@ with U.card("queue"):
         U.html_line(*(U.action_badge(a) for a in U.ACTION_COLORS))
     show_all = top[1].toggle("Include monitor / needs-more-data cases", value=False)
     view = q if show_all else q[q.status != "not_queued"]
+    dec = harness.decisions()
+    pending = set(dec.case_id[dec.status == "PENDING_APPROVAL"])
+    deadline = CO.next_deadlines(asof=date.today())
     table = view.assign(recommended_action=view.recommended_action.map(U.action_label),
-                        status=view.status.str.replace("_", " "))[
-        ["rank", "case_id", "recommended_action", "p_fwa", "confidence", "classes", "dollars_at_risk", "est_hours",
-         "status"]]
+                        status=[("pending approval" if c in pending else s.replace("_", " "))
+                                for c, s in zip(view.case_id, view.status)],
+                        next_deadline=view.case_id.map(deadline).fillna(""))[
+        ["rank", "case_id", "recommended_action", "p_fwa", "confidence", "classes", "dollars_at_risk", "status",
+         "next_deadline"]]
     event = st.dataframe(
         U.table_style(table, "recommended_action", "status"), hide_index=True, width="stretch", height=520,
         on_select="rerun", selection_mode="single-row",
         column_config={
-            "rank": st.column_config.NumberColumn("#", width=36),
-            "case_id": st.column_config.TextColumn("Case", width=100),
-            "recommended_action": st.column_config.TextColumn("Recommended", width=140),
-            "p_fwa": st.column_config.ProgressColumn("P(escalation)", min_value=0, max_value=1, format="%.2f", width=100),
-            "confidence": st.column_config.NumberColumn("Confidence", format="%.2f", width=80,
+            "rank": st.column_config.NumberColumn("#", width=34),
+            "case_id": st.column_config.TextColumn("Case", width=95),
+            "recommended_action": st.column_config.TextColumn("Recommended", width=125),
+            "p_fwa": st.column_config.ProgressColumn("P(escalation)", min_value=0, max_value=1, format="%.2f", width=90),
+            "confidence": st.column_config.NumberColumn("Confidence", format="%.2f", width=75,
                                                         help="Evidence confidence = fused score × data completeness"),
-            "classes": st.column_config.ListColumn("Evidence classes", width=180),
-            "dollars_at_risk": st.column_config.NumberColumn("$ at risk", format="dollar", width=105),
-            "est_hours": st.column_config.NumberColumn("Est. h", format="%.0f", width=50),
-            "status": st.column_config.TextColumn("Status", width=95),
+            "classes": st.column_config.ListColumn("Evidence classes", width=165),
+            "dollars_at_risk": st.column_config.NumberColumn("$ at risk", format="dollar", width=100),
+            "status": st.column_config.TextColumn("Status", width=110),
+            "next_deadline": st.column_config.TextColumn("Next deadline", width=95,
+                                                         help="Earliest open compliance obligation"),
         })
     rows = event.selection.rows if event and hasattr(event, "selection") else []
     if rows:

@@ -80,7 +80,7 @@ def test_case_brief_generates_and_logs(tmp_ledger):
     at.button(key="gen_brief").click().run()
     assert not at.exception, [e.value for e in at.exception]
     lg = ledger.read(tmp_ledger)
-    assert list(lg.event_type) == ["policy_mandate", "brief_generated"]
+    assert list(lg.event_type) == ["policy_mandate", "case_viewed", "brief_generated"]
     assert any("Decision notice" in m.value for m in at.markdown)
 
 

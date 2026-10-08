@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from core import harness
+from core import mandate as MD
 from core import policy_edit as PE
 from eval import metrics as M
 from ui import common as C
@@ -24,6 +25,24 @@ tiles = [("Active version", f"v{pol['version']}", Path(pol["_path"]).name), ("Po
 for col, (label, value, delta) in zip(st.columns(len(tiles)), tiles):
     with col:
         U.metric_tile(label, value, delta, small=label == "Author")
+st.write("")
+
+with U.card("authorisation"):
+    ok, why, pm = MD.policy_status(pol)
+    st.subheader("Authorisation (intent mandate)")
+    U.html_line(U.chip("authorised" if ok else "not authorised", "green" if ok else "red"), why)
+    st.caption(f"Dual control: {', '.join(pol.get('dual_control_actions', [])) or 'none'} · automation may only route "
+               f"{', '.join(pol.get('automation_scope', [])) or 'nothing'} · program {pol.get('program', '—')} · record "
+               f"retention {pol.get('record_retention_years', '—')} years (display only)")
+    if ok and C.my_role() == "siu_lead":
+        with st.expander("Revoke this policy version"):
+            reason = st.text_input("Revocation reason", key="policy_revoke_reason")
+            if st.button("Revoke policy version", key="policy_revoke"):
+                try:
+                    MD.revoke(pm["mandate_hash"], reason, C.me())
+                    st.rerun()
+                except ValueError as e:
+                    st.error(str(e))
 st.write("")
 
 values, avail = {}, PE.available_thresholds(pol)

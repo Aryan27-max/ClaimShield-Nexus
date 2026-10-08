@@ -4,6 +4,7 @@ import json
 import streamlit as st
 
 from core import harness, ledger
+from core import mandate as M
 from ui import common as C
 from ui import style as U
 
@@ -19,10 +20,18 @@ for col, (label, value) in zip(st.columns(len(tiles)), tiles):
         U.metric_tile(label, value, small=isinstance(value, str))
 st.write("")
 
-if st.button("Verify chain", key="verify"):
+b1, b2, _ = st.columns([1, 1, 2])
+if b1.button("Verify chain", key="verify"):
     ok, bad = ledger.verify()
     U.result_card(ok, f"✓ Chain intact — {len(lg)} blocks verified." if ok else
                   f"✕ Chain broken at block {bad}. Every later block is untrusted.")
+if b2.button("Verify signatures", key="verify_sigs"):
+    sigs = M.verify_signatures()
+    bad_sig = sigs[~sigs.signature_ok]
+    U.result_card(bad_sig.empty, f"✓ {len(sigs)} signed mandates verified (Ed25519)." if bad_sig.empty else
+                  f"✕ Signature invalid at block {int(bad_sig.idx.iloc[0])} ({bad_sig.event_type.iloc[0]}).")
+    st.dataframe(sigs.assign(signature_ok=sigs.signature_ok.map({True: "✓", False: "✕"})), hide_index=True,
+                 width="stretch")
     st.write("")
 
 with U.card("chain"):

@@ -1,8 +1,11 @@
 """Overview: alert-collapse funnel, $ at risk, capacity, synthetic validation, fairness check, model vs baseline."""
+from datetime import date
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from core import compliance as CO
 from eval import metrics as M
 from ui import common as C
 from ui import style as U
@@ -48,6 +51,16 @@ with b, U.card("dollars"):
     U.plot(fig)
     U.metric_tile("Weeks to clear the queue", q.attrs.get("weeks_to_clear"),
                   f"{q.attrs.get('queued_hours', 0):.0f} queued h ÷ {q.attrs.get('capacity_hours', 0):.0f} h/week")
+
+st.write("")
+cs = CO.summary(asof=date.today())
+for col, (label, value, delta, tone) in zip(st.columns(3), [
+        ("Obligations due in 7 days", cs["due_soon"], "from executed human decisions", "orange" if cs["due_soon"] else None),
+        ("Overdue obligations", cs["overdue"], "past due date today", "red" if cs["overdue"] else "green"),
+        ("Pending approval", cs["pending_approval"], "awaiting a second SIU-lead signature",
+         "orange" if cs["pending_approval"] else None)]):
+    with col:
+        U.metric_tile(label, value, delta, tone)
 
 st.write("")
 st.header("Synthetic validation")

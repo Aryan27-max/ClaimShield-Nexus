@@ -32,7 +32,7 @@ def test_all_12_sections_and_deterministic(ctx, kind):
     q, pol, t = ctx
     case = _case(q, PICKS[kind])
     md = brief.build(case, pol, *t, generated_at="2026-01-01 00:00 UTC", ledger_idx=7)
-    for i in range(1, 13):
+    for i in range(1, 15):
         assert f"\n## {i}. " in md, i
     assert brief.FOOTER in md and case["case_id"] in md and "#7" in md
     assert md == brief.build(case, pol, *t, generated_at="2026-01-01 00:00 UTC", ledger_idx=7)

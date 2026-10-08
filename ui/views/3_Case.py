@@ -3,9 +3,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from core import brief, harness, identity
+from core import brief, harness, identity, phi
 from core import mandate as M
 from ui import common as C
+from ui import panels as P
 from ui import style as U
 
 q = C.ranked()
@@ -16,6 +17,10 @@ case_id = st.selectbox("Case", ids, index=ids.index(cur) if cur in ids else 0)
 st.session_state["case_id"] = case_id
 r = q.set_index("case_id").loc[case_id]
 pol = C.policy()
+seen = st.session_state.setdefault("viewed_cases", set())
+if case_id not in seen:  # audit controls: who opened which case, once per case per session
+    phi.log_case_view(C.me(), case_id)
+    seen.add(case_id)
 
 who = f"Ring of {r.n_providers} providers" if r.case_type == "ring" else "Provider"
 U.page_header(f"Case {case_id}", f"{who} {', '.join(r.providers)} · {', '.join(r.provider_types)} · "
@@ -38,11 +43,12 @@ if r.recommended_action == "NEEDS_MORE_DATA":
 if r.requires_human:
     st.info("REFER_TO_MFCU is allowed for this case and always requires a human decision.")
 
-tab_ev, tab_risk, tab_tl, tab_net, tab_why, tab_brief = st.tabs(
-    ["Evidence", "Risk forecast", "Timeline", "Network", "Why this action", "Brief"])
+tab_ev, tab_risk, tab_tl, tab_net, tab_why, tab_comp, tab_brief = st.tabs(
+    ["Evidence", "Risk forecast", "Timeline", "Network", "Why this action", "Compliance", "Brief"])
 with tab_ev, U.card("evidence"):
     ev = pd.DataFrame(list(r.evidence))
     if len(ev):
+        ev = ev.assign(value=ev.value.map(phi.mask_text), expected=ev.expected.map(phi.mask_text))
         st.dataframe(ev[["claim_id", "field", "value", "expected", "class", "code", "entity_id"]],
                      hide_index=True, width="stretch", height=360, column_config={
                          "claim_id": st.column_config.TextColumn(width=85), "field": st.column_config.TextColumn(width=125),
@@ -57,6 +63,12 @@ with tab_ev, U.card("evidence"):
             U.metric_tile(label, f"${v:,.0f}")
     st.caption(f"{len(r.alert_ids)} alerts ({', '.join(r.codes)}). $ at risk = paid on the union of claim-level "
                "flags; statistical excess only counts when no claim-level evidence exists.")
+
+with tab_ev, U.card("members"):
+    P.members(r, case_id)
+
+with tab_comp, U.card("compliance"):
+    P.compliance(r, case_id, pol)
 
 with tab_risk, U.card("risk"):
     if r.has_model_score:
@@ -125,6 +137,8 @@ with tab_brief, U.card("brief"):
 
 st.write("")
 with U.card("decision"):
+    P.show_flash()
+    P.authorisation(case_id, pol)
     st.subheader("Human decision")
     who, role = C.me(), C.my_role()
     can_sign = role in ("investigator", "siu_lead")

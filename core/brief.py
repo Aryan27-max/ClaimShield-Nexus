@@ -4,7 +4,8 @@ import hashlib
 
 import pandas as pd
 
-from core import ledger, phi
+from core import ledger, mandate, phi
+from core.policy_schema import regulatory_basis
 
 MAX_ROWS = 8
 CLASS_ORDER = ["deterministic", "structural", "statistical"]
@@ -159,12 +160,32 @@ def action(case) -> list[str]:
     out = [f"Recommended: **{case['recommended_action']}**. Allowed by policy: {', '.join(case['allowed_actions'])}."]
     if case["requires_human"]:
         out.append("REFER_TO_MFCU is allowed and always requires a human decision.")
-    return out + ["The investigator records the final action with user id and reason code; it is hash-chained "
-                  "into the ledger."]
+    return out + ["The deciding investigator signs the decision (Ed25519 decision mandate bound to case, evidence and "
+                  "policy hashes); dual-control actions execute only after a second SIU-lead signature."]
+
+
+def basis(case, policy: dict) -> list[str]:
+    rows = regulatory_basis(policy, case["recommended_action"], case["codes"])
+    out = [f"- **{t}**: {c}" for t, c in rows] or [f"No citation recorded for {case['recommended_action']} (routing)."]
+    hipaa = policy.get("regulatory_basis", {}).get("hipaa", "45 CFR 164.502(b)")
+    return out + ["", f"Member identifiers in this brief are masked (minimum necessary: {hipaa}).",
+                  "Citations are for orientation, not legal advice; state rules vary."]
+
+
+def authorisation(chain: list[dict] | None) -> list[str]:
+    if not chain:
+        return ["No signed decision for this case yet."]
+    rows = []
+    for c in chain:
+        b = c["block"] or {}
+        who = b.get("approver") or b.get("signer") or b.get("issuer") or "—"
+        rows.append([c["step"], who, b.get("fingerprint", "—"), str(b.get("mandate_hash") or "—")[:12],
+                     "✓" if c["signature_ok"] else "✕", "✓" if c["links_ok"] else "✕"])
+    return _table(rows, ["step", "signer", "key fingerprint", "mandate", "signature", "links"])
 
 
 def build(case, policy: dict, claims: pd.DataFrame, providers: pd.DataFrame, gf: pd.DataFrame, meta: dict,
-          generated_at: str, ledger_idx) -> str:
+          generated_at: str, ledger_idx, chain: list[dict] | None = None) -> str:
     """Pure: same inputs => byte-identical markdown."""
     case = dict(case)
     sections = [("Header", header(case, policy, generated_at, ledger_idx)), ("Summary", summary(case)),
@@ -173,7 +194,8 @@ def build(case, policy: dict, claims: pd.DataFrame, providers: pd.DataFrame, gf:
                 ("Confidence & limitations", confidence(case)),
                 ("Why not a higher action", ["```"] + list(case["rule_trace"]) + ["```"]),
                 ("Evidence that would change this", checklist(case)),
-                ("Recommended human action", action(case)),
+                ("Recommended human action", action(case)), ("Regulatory basis", basis(case, policy)),
+                ("Authorisation chain", authorisation(chain)),
                 ("Data sources", [f"- **{t}**: {f}" for t, f in SOURCES] +
                  [f"- **policy**: {policy['_path'].rsplit('/', 1)[-1]} (sha256 {policy['_hash'][:16]})"]),
                 ("Decision notice", [f"**{FOOTER}**"])]
@@ -188,10 +210,10 @@ def generate(case, policy: dict, claims: pd.DataFrame, providers: pd.DataFrame, 
     """Builds the brief inside the ledger write, so the block it cites is exactly the `brief_generated` block
     holding its sha256 (no race with concurrent appends)."""
     now = now or pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d %H:%M UTC")
-    out = {}
+    out, chain = {}, mandate.verify_chain(case["case_id"], db)
 
     def payload(idx: int) -> dict:
-        out["markdown"] = build(case, policy, claims, providers, gf, meta, now, idx)
+        out["markdown"] = build(case, policy, claims, providers, gf, meta, now, idx, chain)
         out["sha256"] = hashlib.sha256(out["markdown"].encode()).hexdigest()
         return {"case_id": case["case_id"], "brief_sha256": out["sha256"], "policy_version": policy["version"],
                 "policy_hash": policy["_hash"], "generated_at": now}
