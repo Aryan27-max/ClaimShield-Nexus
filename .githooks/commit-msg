@@ -1,0 +1,6 @@
+#!/bin/sh
+# Remove AI-attribution lines from commit messages.
+MSG="$1"
+grep -viE 'co-authored-by:.*(claude|anthropic)|claude-session|generated (with|by).*claude|claude\.(ai|com)|anthropic|🤖' "$MSG" > "$MSG.tmp" || true
+mv "$MSG.tmp" "$MSG"
+exit 0

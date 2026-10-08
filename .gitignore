@@ -1,0 +1,20 @@
+# agent files (never committed)
+CLAUDE.md
+BUILD_PLAN.md
+.claude/
+
+# data & artifacts
+data/out/
+*.db
+*.sqlite
+*.parquet
+models/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
+.streamlit/secrets.toml
