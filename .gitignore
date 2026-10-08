@@ -13,7 +13,8 @@ models/
 # python
 __pycache__/
 *.pyc
-.venv/
+.venv
+.venv.nosync/
 .pytest_cache/
 .ipynb_checkpoints/
 .DS_Store

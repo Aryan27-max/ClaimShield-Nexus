@@ -44,3 +44,10 @@ def test_verify_detects_edited_metadata(db):
 def test_tamper_missing_idx_raises(db):
     with pytest.raises(IndexError):
         ledger.tamper(99, db)
+
+
+def test_reset_starts_fresh_chain(db):
+    ledger.reset(db)
+    assert ledger.read(db).empty
+    ledger.append("tester", "event", {"i": 0}, db)
+    assert ledger.read(db).prev_hash.iloc[0] == ledger.GENESIS and ledger.verify(db) == (True, None)

@@ -216,6 +216,8 @@ def generate(seed: int = S.SEED) -> dict:
     gt = []
     for inject in schemes.INJECTORS:
         claims = inject(claims, providers, members, gt, rng, ctx)
+    honest = schemes.honest_error(claims, providers, rng, ctx)
+    claims = honest["claims"]
     claims = finalize(schemes.drop_post_death(claims, members, gt), providers, ctx)
     assert len(claims) <= S.MAX_CLAIMS, len(claims)
     ground_truth = pd.DataFrame(gt, columns=["entity_id", "scheme", "start_date"])
@@ -225,7 +227,7 @@ def generate(seed: int = S.SEED) -> dict:
         "addresses": addresses[["address_id", "line", "zip", "lat", "lon"]], "owners": owners,
         "referrals": make_referrals(claims, ctx, rng), "claims": claims,
         "investigations": schemes.investigations(ground_truth, providers, outliers["ids"], rng),
-        "ground_truth": ground_truth, "legit_outliers": outliers["table"],
+        "ground_truth": ground_truth, "legit_outliers": pd.concat([outliers["table"], honest["table"]], ignore_index=True),
     }
 
 

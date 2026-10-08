@@ -61,6 +61,12 @@ def verify(db: Path | None = None) -> tuple[bool, int | None]:
     return True, None
 
 
+def reset(db: Path | None = None) -> None:
+    """Dev helper: delete the ledger DB and recreate an empty chain."""
+    Path(db or LEDGER_DB).unlink(missing_ok=True)
+    _connect(db).close()
+
+
 def tamper(idx: int, db: Path | None = None) -> None:
     """Demo helper: silently edit a block's payload without re-hashing."""
     with _connect(db) as con:

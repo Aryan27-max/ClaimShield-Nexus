@@ -44,8 +44,23 @@ def test_r07_flags_billing_excluded_providers(data):
 
 def test_no_clean_or_legit_outlier_flagged(data):
     t, alerts = data
-    assert set(alerts.entity_id) <= set(t["ground_truth"].entity_id)
-    assert not set(alerts.entity_id) & set(t["legit_outliers"].entity_id)
+    lo = t["legit_outliers"]
+    honest = set(lo.entity_id[lo.kind == "honest_error"])
+    assert set(alerts.entity_id) <= set(t["ground_truth"].entity_id) | honest
+    assert not set(alerts.entity_id) & set(lo.entity_id[lo.kind != "honest_error"])
+
+
+def test_honest_errors_score_below_planted(data):
+    t, alerts = data
+    lo, gt = t["legit_outliers"], t["ground_truth"]
+    honest = set(lo.entity_id[lo.kind == "honest_error"])
+    assert 10 <= len(honest) <= 20 and not honest & set(gt.entity_id)
+    hits = alerts[alerts.entity_id.isin(honest)]
+    assert hits.groupby("entity_id").code.nunique().le(1).all()
+    assert hits.claim_ids.map(len).le(3).all()
+    for code, g in hits.groupby("code"):
+        planted = alerts[(alerts.code == code) & alerts.entity_id.isin(gt.entity_id)]
+        assert g.score.max() < planted.score.min(), code
 
 
 def test_run_summary_logged_to_ledger(data, tmp_path):

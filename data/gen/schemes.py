@@ -199,6 +199,41 @@ def kickback_referral(claims, providers, members, gt, rng, ctx):
     return pd.concat([claims, ctx["fill"](pd.concat(parts, ignore_index=True))], ignore_index=True)
 
 
+def honest_error(claims, providers, rng, ctx) -> dict:
+    """~15 clean providers with 1-3 one-off billing slips that trip a single rule (not FWA, not in ground_truth)."""
+    vol, mue = ctx["vol"], claims.cpt.map(ctx["cpt"].mue)
+    mue = mue.where(mue <= 8, 0)  # only small-MUE codes, so "+1 unit" stays a slip
+    enroll = claims.provider_id.map(providers.set_index("provider_id").enroll_date)
+    ok = claims.provider_id.isin(ctx["free"]) & (claims.service_date >= enroll + pd.Timedelta(days=1))
+    c1 = claims.cpt.isin([a for a, _ in S.NCCI_PAIRS]) & ok
+    pools = {
+        "dup": claims.provider_id[ok & claims.provider_id.map(ctx["pinfo"].type).isin(["prof", "lab"])],
+        "ncci": claims.provider_id[c1], "mue": claims.provider_id[ok & (mue > 1)],
+    }
+    add, ids, kinds = [], [], []
+    for kind, n_min, n_max in [("dup", 1, 3), ("ncci", 1, 2), ("mue", 1, 1)]:
+        cand = sorted(set(pools[kind]) & ctx["free"] & set(vol.index[vol >= 20]))
+        for pid in rng.choice(cand, 5, replace=False):
+            ctx["free"].discard(pid)
+            k = int(rng.integers(n_min, n_max + 1))
+            if kind == "dup":  # corrected resubmission: same line re-sent weeks later
+                d = claims[ok & (claims.provider_id == pid)].sample(k, random_state=int(rng.integers(1e9))).copy()
+                d["submit_date"] = d.submit_date + _days(rng, k, 20, 60)
+                add.append(d)
+            elif kind == "ncci":  # bundled code billed once without modifier
+                d = claims[c1 & (claims.provider_id == pid)].sample(k, random_state=int(rng.integers(1e9))).copy()
+                d["cpt"], d["units"], d["modifier"] = d.cpt.map(dict(S.NCCI_PAIRS)), 1, ""
+                add.append(d)
+            else:  # MUE breached by one unit, once
+                i = claims.index[ok & (claims.provider_id == pid) & (mue > 1)]
+                i = rng.choice(i, 1)
+                claims.loc[i, "units"] = mue[i].astype(int) + 1
+            ids.append(pid)
+            kinds.append(kind)
+    table = pd.DataFrame({"entity_id": ids, "kind": "honest_error", "detail": kinds})
+    return {"claims": pd.concat([claims, *add], ignore_index=True), "table": table}
+
+
 def drop_post_death(claims, members, gt) -> pd.DataFrame:
     """Only phantom_services providers may bill after a member's date of death."""
     phantom = [e for e, s, _ in gt if s == "phantom_services"]

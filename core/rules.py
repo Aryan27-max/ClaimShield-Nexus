@@ -1,4 +1,5 @@
 """Lens 1: deterministic claim edits (R01-R07) -> common alert schema. Run: python -m core.rules"""
+import argparse
 import hashlib
 import time
 
@@ -155,6 +156,10 @@ def summary(alerts: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--reset-ledger", action="store_true", help="dev: start a fresh ledger before logging")
+    if ap.parse_args().reset_ledger:
+        ledger.reset()
     t0 = time.time()
     t = {n: S.load(n) for n in ["claims", "members", "providers", "addresses"]}
     alerts = run_rules(t["claims"], t["members"], t["providers"], t["addresses"])
