@@ -52,14 +52,14 @@ with U.card("queue"):
         on_select="rerun", selection_mode="single-row",
         column_config={
             "rank": st.column_config.NumberColumn("#", width=34),
-            "case_id": st.column_config.TextColumn("Case", width=95),
-            "recommended_action": st.column_config.TextColumn("Recommended", width=125),
+            "case_id": st.column_config.TextColumn("Case", width=92),
+            "recommended_action": st.column_config.TextColumn("Recommended", width=118),
             "p_fwa": st.column_config.ProgressColumn("P(escalation)", min_value=0, max_value=1, format="%.2f", width=90),
             "confidence": st.column_config.NumberColumn("Confidence", format="%.2f", width=75,
                                                         help="Evidence confidence = fused score × data completeness"),
-            "classes": st.column_config.ListColumn("Evidence classes", width=165),
+            "classes": st.column_config.ListColumn("Evidence classes", width=178),
             "dollars_at_risk": st.column_config.NumberColumn("$ at risk", format="dollar", width=100),
-            "status": st.column_config.TextColumn("Status", width=110),
+            "status": st.column_config.TextColumn("Status", width=105),
             "next_deadline": st.column_config.TextColumn("Next deadline", width=95,
                                                          help="Earliest open compliance obligation"),
         })

@@ -71,7 +71,7 @@ div[class*="st-key-card_"]:hover {{ box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px
 .stButton button p, .stFormSubmitButton button p, .stDownloadButton button p {{ color: #fff !important; }}
 .stButton button:disabled, .stFormSubmitButton button:disabled {{ background: {HAIRLINE} !important; }}
 .stButton button:disabled p, .stFormSubmitButton button:disabled p {{ color: {GRAY} !important; }}
-.st-key-verify button {{ font-size: 19px !important; padding: 0.8rem 2.6rem !important; min-height: 3.2rem; }}
+.st-key-verify button, .st-key-verify_sigs button {{ font-size: 19px !important; padding: 0.8rem 2.6rem !important; min-height: 3.2rem; }}
 [data-testid="stDataFrame"] {{ border: none !important; border-radius: 14px; overflow: hidden; }}
 [data-testid="stExpander"] details {{ border: none; background: {CARD}; border-radius: 14px; box-shadow: {SHADOW}; }}
 [data-testid="stTabs"] [data-baseweb="tab-list"] {{ gap: 6px; }}
