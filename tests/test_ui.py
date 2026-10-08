@@ -56,3 +56,13 @@ def test_decision_without_user_is_rejected(tmp_ledger):
     next(b for b in at.button if b.label == "Record decision").click()
     at.run()
     assert at.error and len(ledger.read(tmp_ledger)) == 0
+
+
+def test_ledger_verify_detects_tamper(tmp_ledger):
+    ledger.append("system:test", "probe", {"x": 1}, tmp_ledger)
+    ledger.tamper(0, tmp_ledger)
+    at = _app("pages/6_Ledger.py")
+    at.button(key="verify").click()
+    at.run()
+    assert not at.exception
+    assert any("broken at block 0" in m.value for m in at.markdown)

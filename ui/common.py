@@ -14,11 +14,9 @@ import streamlit as st  # noqa: E402
 from core import graph, harness  # noqa: E402
 from core import queue as Q  # noqa: E402
 from core import schema as S  # noqa: E402
+from ui import style as U  # noqa: E402
 
-HARNESS_COLS = ["allowed_actions", "recommended_action", "rule_trace", "requires_human", "missing_classes",
-                "predictive_driven", "est_hours", "policy_version", "policy_hash"]
 FOOTER = "Recommendation only — final action requires a human decision."
-KIND_COLOR = {"provider": "#4C78A8", "member": "#BAB0AC", "owner": "#F58518", "address": "#54A24B", "bank": "#B279A2"}
 
 
 def _mtime(p: Path) -> float:
@@ -41,7 +39,7 @@ def policy(path: str | None = None) -> dict:
 
 @st.cache_data(show_spinner=False)
 def _cases(path: str, mtime: float, cases_mtime: float) -> pd.DataFrame:
-    base = pd.read_parquet(S.CASES).drop(columns=HARNESS_COLS, errors="ignore")
+    base = pd.read_parquet(S.CASES).drop(columns=harness.OUTPUT_COLS, errors="ignore")
     return harness.evaluate_all(base, harness.load_policy(path))
 
 
@@ -88,18 +86,14 @@ def ego_html(entity_id: str, highlight: list[str], max_nodes: int = 150) -> tupl
     from pyvis.network import Network
     G, gf = graph_obj(_mtime(S.OUT / "claims.parquet"))
     sub = graph.ego_graph(entity_id, max_nodes=max_nodes, G=G, graph_features=gf)
-    net = Network(height="520px", width="100%", cdn_resources="in_line", bgcolor="#ffffff")
+    net = Network(height="520px", width="100%", cdn_resources="in_line", bgcolor=U.CARD, font_color=U.TEXT)
     for n, d in sub.nodes(data=True):
         kind = d.get("kind", "?")
         hot = n in highlight
         net.add_node(n, label=n if kind != "member" else "", title=f"{kind} {n} {d.get('type', '')}",
-                     color="#E45756" if hot else KIND_COLOR.get(kind, "#999"), size=22 if hot else (8 if kind == "member" else 14))
+                     color=U.NODE_COLORS["highlight"] if hot else U.NODE_COLORS.get(kind, U.GRAY), size=22 if hot else (8 if kind == "member" else 14))
     for u, v, d in sub.edges(data=True):
-        net.add_edge(u, v, title=d.get("rel", ""), color="#E45756" if d.get("rel") == "refers" else "#cccccc",
+        net.add_edge(u, v, title=d.get("rel", ""), color=U.EDGE_COLORS.get(d.get("rel"), U.EDGE_COLORS["default"]),
                      width=2 if d.get("rel") == "refers" else 1)
     net.toggle_physics(True)
     return net.generate_html(), sub.number_of_nodes()
-
-
-def chips(classes) -> str:
-    return " ".join(f":blue-badge[{c}]" for c in classes)

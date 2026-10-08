@@ -7,8 +7,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import streamlit as st  # noqa: E402
 
 from ui import common as C  # noqa: E402
+from ui import style as U  # noqa: E402
 
 st.set_page_config(page_title="ClaimShield Nexus", page_icon=":shield:", layout="wide")
+U.inject_css()
 
 PAGES = [st.Page("pages/2_Queue.py", title="SIU Queue", icon=":material/format_list_numbered:", default=True),
          st.Page("pages/3_Case.py", title="Case", icon=":material/folder_open:"),
@@ -16,8 +18,9 @@ PAGES = [st.Page("pages/2_Queue.py", title="SIU Queue", icon=":material/format_l
 nav = st.navigation(PAGES)
 
 with st.sidebar:
-    st.markdown("### ClaimShield Nexus")
+    st.markdown("## ClaimShield Nexus")
     st.caption("Machines find evidence. Humans make decisions. The ledger proves it.")
+    st.divider()
     files = C.policy_files()
     st.session_state.setdefault("policy_path", files[0] if files else str(C.S.POLICY))
     pol = C.policy(st.session_state["policy_path"])

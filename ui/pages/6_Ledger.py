@@ -5,31 +5,43 @@ import streamlit as st
 
 from core import harness, ledger
 from ui import common as C
+from ui import style as U
 
-st.title("Audit Ledger")
-st.caption("Append-only SHA-256 hash chain: hash = SHA256(prev_hash ‖ payload_sha ‖ ts ‖ actor ‖ event_type).")
+U.page_header("Audit Ledger", "Append-only SHA-256 hash chain · hash = SHA256(prev_hash ‖ payload_sha ‖ ts ‖ actor ‖ event_type)")
 
 lg = ledger.read()
-c = st.columns(4)
-c[0].metric("Blocks", len(lg))
-c[1].metric("Human decisions", int((lg.event_type == "human_decision").sum()) if len(lg) else 0)
-c[2].metric("Policy", C.meta().get("policy_hash", "-")[:10])
-c[3].metric("Cases Merkle root", C.meta().get("cases_merkle_root", "-")[:10])
+m = C.meta()
+tiles = [("Blocks", len(lg)), ("Human decisions", int((lg.event_type == "human_decision").sum()) if len(lg) else 0),
+         ("Policy hash", m.get("policy_hash", "-")[:10]), ("Cases Merkle root", m.get("cases_merkle_root", "-")[:10]),
+         ("Model params", m.get("model_params_hash", "-")[:10])]
+for col, (label, value) in zip(st.columns(len(tiles)), tiles):
+    with col:
+        U.metric_tile(label, value)
+st.write("")
 
-if st.button("Verify chain", type="primary"):
+if st.button("Verify chain", key="verify"):
     ok, bad = ledger.verify()
-    if ok:
-        st.success(f"Chain OK — {len(lg)} blocks verified.")
-    else:
-        st.error(f"Chain broken at block {bad}.")
+    U.result_card(ok, f"✓ Chain intact — {len(lg)} blocks verified." if ok else
+                  f"✕ Chain broken at block {bad}. Every later block is untrusted.")
+    st.write("")
 
-if len(lg):
-    view = lg.tail(50).iloc[::-1].assign(
-        payload=lambda d: d.payload_json.map(lambda s: json.dumps(json.loads(s))[:140]),
-        prev_hash=lambda d: d.prev_hash.str[:12], hash=lambda d: d.hash.str[:12])
-    st.dataframe(view[["idx", "ts", "actor", "event_type", "prev_hash", "hash", "payload"]],
-                 hide_index=True, width="stretch", height=420)
+with U.card("chain"):
+    st.subheader("Latest 50 blocks")
+    if len(lg):
+        view = lg.tail(50).iloc[::-1].assign(
+            payload=lambda d: d.payload_json.map(lambda s: json.dumps(json.loads(s))[:140]),
+            prev_hash=lambda d: d.prev_hash.str[:12], hash=lambda d: d.hash.str[:12])
+        st.dataframe(view[["idx", "ts", "actor", "event_type", "prev_hash", "hash", "payload"]],
+                     hide_index=True, width="stretch", height=420)
 
+d = harness.decisions()
+if len(d):
+    st.write("")
+    with U.card("decisions"):
+        st.subheader("Human decisions")
+        st.dataframe(d.iloc[::-1], hide_index=True, width="stretch")
+
+st.write("")
 with st.expander("Demo controls"):
     a, b = st.columns(2)
     with a:
@@ -47,9 +59,4 @@ with st.expander("Demo controls"):
                 pipeline.run_all(reset_ledger=True)
             st.cache_data.clear()
             st.rerun()
-
-d = harness.decisions()
-if len(d):
-    st.subheader("Decisions")
-    st.dataframe(d.iloc[::-1], hide_index=True, width="stretch")
 st.caption(C.FOOTER)
