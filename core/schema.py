@@ -95,3 +95,8 @@ def cpt_table() -> pd.DataFrame:
     """CPT code table as a DataFrame indexed by cpt."""
     cols = ["desc", "category", "fee", "mue", "minutes_per_unit", "units_lo", "units_hi"]
     return pd.DataFrame.from_dict(CPT, orient="index", columns=cols).rename_axis("cpt")
+
+
+def load(name: str) -> pd.DataFrame:
+    """Read a generated table from data/out."""
+    return pd.read_parquet(OUT / f"{name}.parquet")
