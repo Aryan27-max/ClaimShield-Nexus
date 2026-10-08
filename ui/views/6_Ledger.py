@@ -51,7 +51,7 @@ if len(d):
         st.dataframe(d.iloc[::-1], hide_index=True, width="stretch")
 
 st.write("")
-with st.expander("Demo controls"):
+with st.expander("Demo controls", expanded=bool(st.session_state.pop("open_reset", False))):
     a, b = st.columns(2)
     with a:
         st.markdown("**Simulate tamper** — edits a block's payload without re-hashing.")

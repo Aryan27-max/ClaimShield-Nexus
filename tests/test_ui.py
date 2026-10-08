@@ -250,3 +250,12 @@ def test_auditor_cannot_reveal(tmp_ledger):
     at.run()
     at.switch_page("views/3_Case.py").run()
     assert next(b for b in at.button if b.label == "Reveal member details").disabled
+
+
+def test_sidebar_reset_demo_opens_ledger_controls(tmp_ledger):
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.run()
+    assert any("Public demo · synthetic data · shared state" in m.value for m in at.sidebar.markdown)
+    next(b for b in at.sidebar.button if b.label == "Reset demo").click().run()
+    assert not at.exception and at.title[0].value == "Audit Ledger"
+    assert any(b.label == "Reset demo ledger" for b in at.button)

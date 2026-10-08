@@ -31,6 +31,7 @@ nav = st.navigation(PAGES)
 with st.sidebar:
     st.markdown("## ClaimShield Nexus")
     st.caption("Machines find evidence. Humans make decisions. The ledger proves it.")
+    U.html_line(U.chip("Public demo · synthetic data · shared state", "blue"))
     st.divider()
     st.session_state.setdefault("identity", "inv.a")
     st.selectbox("Signed in as", identity.people(), key="identity",
@@ -55,6 +56,9 @@ with st.sidebar:
     st.caption("Queue uses the calibrated escalation model for this horizon.")
     st.slider("Investigators", 1, 10, value=pol["capacity"]["investigators"], key="investigators")
     st.caption(f"{pol['capacity']['hours_per_investigator_week']} h per investigator per week")
+    if st.button("Reset demo", help="Opens the demo controls on the Audit Ledger page (fresh ledger and pipeline)."):
+        st.session_state["open_reset"] = True
+        st.switch_page("views/6_Ledger.py")
     if st.button("Re-run pipeline", help="Not needed for normal use; sliders only re-rank."):
         from core import pipeline
         try:
