@@ -11,27 +11,31 @@
 ```mermaid
 flowchart LR
   subgraph DATA[Synthetic Data Layer]
-    G[synth.py<br/>planted schemes] --> T[(claims, members,<br/>providers, facilities,<br/>referrals, owners,<br/>investigations)]
-    G --> GT[(ground_truth<br/>eval only)]
+    G["synth.py<br/>planted schemes + legit outliers"] --> T[("claims, members,<br/>providers, facilities,<br/>referrals, owners,<br/>investigations")]
+    G --> GT[("ground_truth<br/>eval only")]
   end
 
   subgraph LENSES[Detection Lenses]
-    R[Rules<br/>NCCI/MUE/dup/timing]
-    A[Anomaly<br/>peer z + IsolationForest]
-    N[Graph<br/>communities + risk propagation]
-    P[Predict<br/>LightGBM 30/60/90 + SHAP]
+    R["Rules<br/>NCCI / MUE / dup / timing"]
+    A["Anomaly<br/>peer z + IsolationForest"]
+    N["Graph<br/>rings, referral loops, PPR"]
+    P["Predict<br/>LightGBM 30/60/90 + SHAP"]
   end
 
   T --> R & A & N & P
-  R & A & N & P --> F[Fusion<br/>entity cases, evidence strength,<br/>calibrated confidence, abstain]
-  F --> H{Decision Harness<br/>policy YAML v#}
-  H --> Q[Capacity-aware SIU Queue]
-  Q --> B[Brief Generator<br/>deterministic template]
+  R & A & N --> F["Fusion<br/>entity cases, evidence classes,<br/>noisy-OR confidence, abstain"]
+  P -.->|forecast only| F
+  F --> H{"Decision Harness<br/>policy YAML v#"}
+  PE["Policy page<br/>preview, save vN"] --> H
+  H --> Q["Capacity-aware SIU Queue"]
+  Q --> B["Brief Generator<br/>deterministic template"]
   B --> UI[Streamlit UI]
   UI --> HU((Human Investigator))
-  HU -->|action + reason code| L[(Hash-chained Ledger)]
+  HU -->|action + reason code| L[("Hash-chained Ledger")]
   R & A & N & P & H -.log.-> L
-  GT -.-> E[Eval: recall per scheme,<br/>alert-collapse funnel] --> UI
+  PE -.->|policy_change| L
+  B -.->|brief_generated| L
+  GT -.-> E["Eval: recall per scheme,<br/>funnel, fairness"] --> UI
 ```
 
 ## 3. Data model
@@ -114,21 +118,24 @@ stateDiagram-v2
   HumanDecision --> Ledger: action + reason_code + user_id
   Ledger --> [*]
 ```
-Evidence classes: **deterministic** (rules), **structural** (graph), **statistical** (anomaly), **predictive** (P5; absent until then). Independence = distinct classes, not distinct alerts. Confidence = weighted noisy-OR of per-class max scores × data-completeness factor (no isotonic calibration until the predictive class lands in P5; 60 labels are too few). Abstain only when the case rests on statistical evidence alone below `abstain.statistical_min`, or data completeness is low; a strong single deterministic or structural signal may reach PREPAY_REVIEW / FULL_INVESTIGATION. MFCU always needs ≥ 2 classes + min $ + min confidence + a human.
+Evidence classes: **deterministic** (rules), **structural** (graph), **statistical** (anomaly); the **predictive** forecast (P5) is kept out of the classes. Independence = distinct classes, not distinct alerts. Confidence = weighted noisy-OR of per-class max scores × data-completeness factor (no isotonic calibration: 60 past investigations are too few labels; the predictive forecast is calibrated separately and stays out of confidence). Abstain only when the case rests on statistical evidence alone below `abstain.statistical_min`, or data completeness is low; a strong single deterministic or structural signal may reach PREPAY_REVIEW / FULL_INVESTIGATION. MFCU always needs ≥ 2 classes + min $ + min confidence + a human.
 
-Example policy (`policy/harness_v1.yaml`, abridged):
+Example policy (`policy/harness_v1.yaml`, abridged; values as shipped):
 ```yaml
 version: 1
-class_weights: {deterministic: 0.95, structural: 0.85, statistical: 0.55, predictive: 0.7}
-abstain: {statistical_min: 0.75, min_completeness: 0.6}
+class_weights: {deterministic: 0.95, structural: 0.9, statistical: 0.7, predictive: 0.7}
+abstain: {statistical_min: 0.6, min_completeness: 0.6}
+predictive: {lift_min: 0.7, statistical_min: 0.75}
 actions:
-  REFER_TO_MFCU:      {min_classes: 2, min_conf: 0.85, min_dollars: 25000, requires_human: true}
-  FULL_INVESTIGATION: {min_conf: 0.75, min_dollars: 5000, any_of: [{min_classes: 2}, {classes_any: [structural], min_severity: 4}, {classes_any: [deterministic], min_severity: 4}]}
-  PREPAY_REVIEW:      {min_conf: 0.55, classes_any: [deterministic, structural]}
-  PROVIDER_EDUCATION: {classes_any: [deterministic, statistical], max_dollars: 5000}
-weights: {severity: {1: 1, 3: 1.5, 5: 3}, member_harm: {bh: 2.0, home_health: 1.8, default: 1.0}}
+  REFER_TO_MFCU:      {requires_human: true, min_classes: 2, min_conf: 0.85, min_dollars: 25000, min_severity: 4}
+  FULL_INVESTIGATION: {min_conf: 0.7, any_of: [{min_classes: 2, min_dollars: 5000}, {classes_any: [structural], min_severity: 4, min_dollars: 5000}, {classes_any: [deterministic], min_severity: 4, min_dollars: 5000}, {classes_any: [deterministic], min_severity: 5}]}
+  PREPAY_REVIEW:      {any_of: [{classes_any: [deterministic, structural], min_conf: 0.55}, {codes_any: ["AN:em_hi_share"], min_class_score: {statistical: 0.85}, min_conf: 0.55}, {predictive_lift: true}]}
+  PROVIDER_EDUCATION: {max_dollars: 5000, max_severity: 3, codes_any: [R01, R02, R03, "AN:em_hi_share", "AN:units_per_claim"]}
+est_hours: {PROVIDER_EDUCATION: 2, PREPAY_REVIEW: 6, FULL_INVESTIGATION: 16, REFER_TO_MFCU: 12, per_extra_provider: 2}
+must_take: {actions: [REFER_TO_MFCU], min_severity: 5}
 capacity: {investigators: 3, hours_per_investigator_week: 30}
 ```
+Every policy is validated on load, preview and save (probabilities in [0, 1], non-negative dollars and hours, all actions present). Humans change thresholds on the Policy page: the preview is in memory only; saving writes the next `harness_vN.yaml` (never overwriting) and a `policy_change` ledger block (old hash → new hash, author, reason).
 
 Queue: `priority = p_fwa(h) × $ at risk × severity_w × member_harm_w ÷ est_hours`. Must-take cases (policy `must_take`: REFER_TO_MFCU or severity ≥ 5) are filled first; a must-take case that doesn't fit is flagged `over_capacity` (escalate to SIU lead), never silently deferred. The rest fill greedily; overflow is `deferred`. Backlog = queued hours ÷ weekly capacity (weeks to clear).
 
@@ -155,7 +162,7 @@ sequenceDiagram
 ```
 
 ## 8. Audit ledger
-Append-only SQLite table: `idx, ts, actor, event_type, payload_json, payload_sha, prev_hash, hash` where `hash = SHA256(prev_hash || payload_sha || ts || actor)`. `verify()` recomputes every hash and returns the first broken index. This gives tamper evidence without a blockchain and without exposing PHI.
+Append-only SQLite table: `idx, ts, actor, event_type, payload_json, payload_sha, prev_hash, hash` where `hash = SHA256(prev_hash || payload_sha || ts || actor || event_type)`. Writers are serialised (`BEGIN IMMEDIATE`), so concurrent sessions never collide or fork the chain. Blocks: `lens_run`, `model_run`, `fusion_run` (policy hash + Merkle root over case hashes), `policy_change`, `brief_generated` (brief sha256; the brief cites its own block index) and `human_decision`. `verify()` recomputes every hash and returns the first broken index. This gives tamper evidence without a blockchain and without storing PHI or claim lines.
 
 ## 9. Responsible AI
 | Risk | Mitigation |
