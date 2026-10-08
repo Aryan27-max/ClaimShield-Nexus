@@ -181,13 +181,16 @@ def build(case, policy: dict, claims: pd.DataFrame, providers: pd.DataFrame, gf:
 
 def generate(case, policy: dict, claims: pd.DataFrame, providers: pd.DataFrame, gf: pd.DataFrame, meta: dict,
              actor: str = "system:brief", db=None, now: str | None = None) -> dict:
-    """Builds the brief and appends a `brief_generated` ledger block with its sha256."""
-    lg = ledger.read(db)
-    idx = int(lg.idx.max()) + 1 if len(lg) else 0
+    """Builds the brief inside the ledger write, so the block it cites is exactly the `brief_generated` block
+    holding its sha256 (no race with concurrent appends)."""
     now = now or pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d %H:%M UTC")
-    md = build(case, policy, claims, providers, gf, meta, now, idx)
-    sha = hashlib.sha256(md.encode()).hexdigest()
-    entry = ledger.append(actor, "brief_generated", {"case_id": case["case_id"], "brief_sha256": sha,
-                                                     "policy_version": policy["version"],
-                                                     "policy_hash": policy["_hash"], "generated_at": now}, db)
-    return {"markdown": md, "sha256": sha, "ledger_idx": entry["idx"], "generated_at": now}
+    out = {}
+
+    def payload(idx: int) -> dict:
+        out["markdown"] = build(case, policy, claims, providers, gf, meta, now, idx)
+        out["sha256"] = hashlib.sha256(out["markdown"].encode()).hexdigest()
+        return {"case_id": case["case_id"], "brief_sha256": out["sha256"], "policy_version": policy["version"],
+                "policy_hash": policy["_hash"], "generated_at": now}
+
+    entry = ledger.append(actor, "brief_generated", payload, db)
+    return {**out, "ledger_idx": entry["idx"], "generated_at": now}

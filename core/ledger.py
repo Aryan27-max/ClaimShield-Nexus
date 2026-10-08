@@ -2,6 +2,8 @@
 import hashlib
 import json
 import sqlite3
+from collections.abc import Callable
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,28 +26,36 @@ def _block_hash(prev_hash: str, payload_sha: str, ts: str, actor: str, event_typ
 
 
 def _connect(db: Path | None) -> sqlite3.Connection:
+    """Autocommit connection (explicit transactions only); waits up to 30 s for another writer."""
     db = Path(db or LEDGER_DB)
     db.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(db)
+    con = sqlite3.connect(db, timeout=30, isolation_level=None)
     con.execute(DDL)
     return con
 
 
-def append(actor: str, event_type: str, payload: dict, db: Path | None = None) -> dict:
-    """Append one event; returns its idx and hash."""
-    body = json.dumps(payload, sort_keys=True, default=str)
-    ts = datetime.now(timezone.utc).isoformat()
-    with _connect(db) as con:
-        last = con.execute("SELECT idx, hash FROM ledger ORDER BY idx DESC LIMIT 1").fetchone()
-        idx, prev = (last[0] + 1, last[1]) if last else (0, GENESIS)
-        psha = _sha(body)
-        h = _block_hash(prev, psha, ts, actor, event_type)
-        con.execute("INSERT INTO ledger VALUES (?,?,?,?,?,?,?,?)", (idx, ts, actor, event_type, body, psha, prev, h))
+def append(actor: str, event_type: str, payload: dict | Callable[[int], dict], db: Path | None = None) -> dict:
+    """Append one event; returns its idx and hash. Writers are serialised (BEGIN IMMEDIATE), so concurrent sessions
+    never collide or fork the chain. A callable payload is called with the index the block will occupy."""
+    with closing(_connect(db)) as con:
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            last = con.execute("SELECT idx, hash FROM ledger ORDER BY idx DESC LIMIT 1").fetchone()
+            idx, prev = (last[0] + 1, last[1]) if last else (0, GENESIS)
+            body = json.dumps(payload(idx) if callable(payload) else payload, sort_keys=True, default=str)
+            ts = datetime.now(timezone.utc).isoformat()
+            psha = _sha(body)
+            h = _block_hash(prev, psha, ts, actor, event_type)
+            con.execute("INSERT INTO ledger VALUES (?,?,?,?,?,?,?,?)", (idx, ts, actor, event_type, body, psha, prev, h))
+            con.execute("COMMIT")
+        except BaseException:
+            con.execute("ROLLBACK")
+            raise
     return {"idx": idx, "hash": h}
 
 
 def read(db: Path | None = None) -> pd.DataFrame:
-    with _connect(db) as con:
+    with closing(_connect(db)) as con:
         return pd.read_sql("SELECT * FROM ledger ORDER BY idx", con)
 
 
@@ -69,7 +79,7 @@ def reset(db: Path | None = None) -> None:
 
 def tamper(idx: int, db: Path | None = None) -> None:
     """Demo helper: silently edit a block's payload without re-hashing."""
-    with _connect(db) as con:
+    with closing(_connect(db)) as con:
         body = con.execute("SELECT payload_json FROM ledger WHERE idx=?", (idx,)).fetchone()
         if body is None:
             raise IndexError(idx)

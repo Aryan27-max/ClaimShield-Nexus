@@ -70,3 +70,19 @@ def test_tamper_on_each_event_type_detected_at_exact_block(tmp_path, idx):
 def test_verify_on_empty_ledger(tmp_path):
     path = tmp_path / "empty.db"
     assert ledger.read(path).empty and ledger.verify(path) == (True, None)
+
+
+def test_concurrent_appends_never_collide(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    path = tmp_path / "concurrent.db"
+    with ThreadPoolExecutor(8) as ex:
+        list(ex.map(lambda i: ledger.append("system:test", "event", {"i": i}, path), range(80)))
+    df = ledger.read(path)
+    assert list(df.idx) == list(range(80)) and ledger.verify(path) == (True, None)
+
+
+def test_callable_payload_receives_its_block_index(tmp_path):
+    path = tmp_path / "callable.db"
+    ledger.append("system:test", "event", {}, path)
+    out = ledger.append("system:test", "event", lambda idx: {"cites_block": idx}, path)
+    assert out["idx"] == 1 and json.loads(ledger.read(path).payload_json[1]) == {"cites_block": 1}

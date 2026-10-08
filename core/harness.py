@@ -3,6 +3,7 @@ decide() is the only writer of final actions (human user_id + reason_code, ledge
 import copy
 import hashlib
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -166,7 +167,7 @@ def decide(case_id: str, action: str, user_id: str, reason_code: str, note: str 
                "note": note, "confidence": float(row.iloc[0].confidence),
                "policy_version": policy["version"], "policy_hash": policy["_hash"]}
     entry = ledger.append(f"human:{user_id}", "human_decision", payload, db)
-    with _db(db) as con:
+    with closing(_db(db)) as con, con:
         cur = con.execute("INSERT INTO decisions (ts, case_id, action, recommended_action, user_id, reason_code, note, "
                           "policy_version, policy_hash, ledger_idx) VALUES (?,?,?,?,?,?,?,?,?,?)",
                           (datetime.now(timezone.utc).isoformat(), case_id, action, ev["recommended_action"], user_id,
@@ -175,7 +176,7 @@ def decide(case_id: str, action: str, user_id: str, reason_code: str, note: str 
 
 
 def decisions(db=None) -> pd.DataFrame:
-    with _db(db) as con:
+    with closing(_db(db)) as con:
         return pd.read_sql("SELECT * FROM decisions ORDER BY decision_id", con)
 
 
