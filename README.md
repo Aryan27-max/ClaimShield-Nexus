@@ -1,5 +1,15 @@
 # ClaimShield Nexus
 
+<div align="center">
+  <img
+    src="https://github.com/user-attachments/assets/d039dfda-8cda-4a2b-9427-4ba33a65e3b5"
+    alt="ClaimShield Nexus"
+    width="300"
+  />
+</div>
+
+<div align="center">
+
 **Machines find evidence. Humans make decisions. The ledger proves it.**
 
 **Team Aurora** — Aryan Gupta
