@@ -1,4 +1,4 @@
-# ClaimShield Nexus
+# ClaimShield Nexus - Machines fins evidence. Humans make decisions. Ledgers prove it
 
 <div align="center">
   <img
