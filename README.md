@@ -9,10 +9,11 @@
 </div>
 
 <div align="center">
-
-**Machines find evidence. Humans make decisions. The ledger proves it.**
+Machines find evidence. Humans make decisions. The ledger proves it.
 
 **Team Aurora** — Aryan Gupta
+
+
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![pandas](https://img.shields.io/badge/pandas-3.0-150458?logo=pandas&logoColor=white)
@@ -28,6 +29,7 @@
 ![PyYAML](https://img.shields.io/badge/PyYAML-6.0-CB171E)
 ![cryptography](https://img.shields.io/badge/cryptography-Ed25519-4B8BBE)
 ![pytest](https://img.shields.io/badge/pytest-186%20tests-0A9EDC?logo=pytest&logoColor=white)
+</div>
 
 | Layer | Technology |
 |---|---|
@@ -41,17 +43,6 @@
 | UI | Streamlit multipage app, Plotly charts |
 | Testing | pytest, Streamlit AppTest, fresh-clone end-to-end check |
 
-## Live demo
-
-**<DEPLOY_URL>** (public demo · synthetic data only · state shared by all visitors; use **Reset demo** in the sidebar to start over).
-
-Deploy your own on Streamlit Community Cloud:
-
-1. Sign in at [share.streamlit.io](https://share.streamlit.io) with the GitHub account that can read the repository.
-2. **Create app** → **Deploy a public app from GitHub**.
-3. Repository `Aryan27-max/ClaimShield-Nexus`, branch `main`, main file path `ui/app.py`.
-4. **Advanced settings** → Python version **3.11**. No secrets are needed.
-5. **Deploy.** Community Cloud installs `requirements.txt` and `packages.txt` (`libgomp1` for LightGBM). The first visit builds the synthetic data, models, ledger and demo signing keys (about 20 s, with a spinner); later visits reuse them until the app restarts, because the disk is ephemeral.
 
 ## Overview
 
